@@ -19,7 +19,7 @@ for (let page = 1; page <= 2; page++) {
   const html = await response.text();
   for (const match of html.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/g)) {
     const cells = [...match[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map((cell) => clean(cell[1]));
-    if (cells.length >= 6 && stageOrder[cells[5]]) cleanupRows.push({ name: cells[3], address: cells[4], stage: cells[5] });
+    if (cells.length >= 6 && stageOrder[cells[5]]) cleanupRows.push({ district: cells[1], name: cells[3], address: cells[4], stage: cells[5] });
   }
 }
 
@@ -49,7 +49,8 @@ for (const row of cleanupRows) {
   if (!project || matched.has(project[0])) continue;
   matched.add(project[0]);
   const stage = row.stage;
-  statements.push(`insert into public.project_stages (project_id, stage_name, stage_order) select id, ${sqlValue(stage)}, ${stageOrder[stage]} from public.projects where source_code = ${sqlValue(project[0])} on conflict (project_id, stage_name) do update set stage_order = excluded.stage_order; update public.projects set current_status = ${sqlValue(stage)}, updated_at = now() where source_code = ${sqlValue(project[0])};`);
+  const district = row.district;
+  statements.push(`insert into public.project_stages (project_id, stage_name, stage_order) select id, ${sqlValue(stage)}, ${stageOrder[stage]} from public.projects where source_code = ${sqlValue(project[0])} on conflict (project_id, stage_name) do update set stage_order = excluded.stage_order; update public.projects set current_status = ${sqlValue(stage)}, district = coalesce(district, ${sqlValue(district)}), updated_at = now() where source_code = ${sqlValue(project[0])};`);
 }
 await writeFile(output, `-- 서울시 정비사업 정보몽땅 사업장 진행단계\n-- 검색 행: ${cleanupRows.length}, 매칭 사업장: ${matched.size}\n${statements.join("\n")}\n`);
 console.log(`정보몽땅 ${cleanupRows.length}건 중 ${matched.size}개 사업장의 단계를 생성했습니다: ${output}`);
