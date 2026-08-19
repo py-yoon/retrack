@@ -9,7 +9,9 @@
     "lint": "eslint",
     "data:projects": "node --env-file=.env.local scripts/build-seoul-import.mjs",
     "data:events": "node --env-file=.env.local scripts/build-seoul-events-import.mjs",
-    "data:stages": "node --env-file=.env.local scripts/build-cleanup-stages-import.mjs"
+    "data:stages": "node --env-file=.env.local scripts/build-cleanup-stages-import.mjs",
+    "data:audit": "node --env-file=.env.local scripts/audit-matching.mjs",
+    "data:sync": "node --env-file=.env.local scripts/sync-all.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.2",

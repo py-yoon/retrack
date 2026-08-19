@@ -57,20 +57,20 @@ npm run dev
 
 ## 📊 데이터 파이프라인
 
-서울시 공공데이터와 정보몽땅에서 데이터를 수집하여 SQL을 생성합니다.
+서울시 공공데이터와 정보몽땅에서 데이터를 수집·매칭하여 DB를 최신 상태로 유지합니다.
 
 ```bash
-# 서울시 도시계획 정비사업 기본 사업장 데이터 수집
-npm run data:projects
+# 전체 파이프라인 원클릭 동기화 (수집 -> 매칭 -> 원격 DB 반영)
+npm run data:sync
 
-# 서울시 도시계획 시행계획 공고 이벤트 매칭 및 수집
-npm run data:events
+# 데이터 매칭 품질 및 정합성 검수 리포트 실행
+npm run data:audit
 
-# 서울시 정보몽땅 사업장 추진단계 매칭 및 수집
-npm run data:stages
+# 개별 수집 스크립트 실행 (SQL 생성)
+npm run data:projects   # 서울시 도시계획 정비사업장 수집 & 자치구 매칭
+npm run data:events     # 서울시 시행계획 공고 이벤트 매칭 & 중요도 분류
+npm run data:stages     # 서울시 정보몽땅 사업장 추진단계 매칭
 ```
-
-생성된 SQL 파일은 `/tmp/` 디렉터리에 저장되며, Supabase SQL Editor 또는 CLI를 통해 적용할 수 있습니다.
 
 ---
 
