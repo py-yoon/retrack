@@ -1,0 +1,30 @@
+{
+  "name": "retrack",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "data:projects": "node --env-file=.env.local scripts/build-seoul-import.mjs",
+    "data:events": "node --env-file=.env.local scripts/build-seoul-events-import.mjs",
+    "data:stages": "node --env-file=.env.local scripts/build-cleanup-stages-import.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.112.2",
+    "next": "16.2.12",
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.12",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}
