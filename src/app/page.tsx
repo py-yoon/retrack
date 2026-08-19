@@ -31,12 +31,6 @@ const emptyStats = [
 
 const POPULAR_DISTRICTS = ["강남구", "서초구", "송파구", "용산구", "성동구", "마포구", "영등포구", "동작구"];
 
-function seoulDate(offsetDays = 0) {
-  const date = new Date();
-  date.setDate(date.getDate() + offsetDays);
-  return date.toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
-}
-
 function formatDate(date: string) {
   return date.replaceAll("-", ".");
 }
@@ -50,28 +44,34 @@ export default function Home() {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState("");
-  const today = seoulDate();
-  const weekAgo = seoulDate(-6);
 
   useEffect(() => {
     async function loadDashboard() {
       try {
         const supabase = getSupabaseClient();
-        const [todayEvents, recentEvents] = await Promise.all([
-          supabase.from("events").select("importance,event_type").eq("occurred_at", today),
+        const [totalRes, majorRes, recentEventsRes] = await Promise.all([
+          supabase.from("events").select("id", { count: "exact", head: true }),
+          supabase.from("events").select("id", { count: "exact", head: true }).eq("importance", 3),
           supabase
             .from("events")
             .select("id,project_id,title,importance,occurred_at,project:projects(name,district)")
-            .gte("occurred_at", weekAgo)
-            .lte("occurred_at", today)
             .order("occurred_at", { ascending: false })
-            .limit(5),
+            .limit(6),
         ]);
-        if (todayEvents.error) throw todayEvents.error;
-        if (recentEvents.error) throw recentEvents.error;
 
-        const statRows = (todayEvents.data ?? []) as Array<{ importance: number; event_type: string }>;
-        const recentRows = (recentEvents.data ?? []) as unknown as Array<{
+        if (recentEventsRes.error) throw recentEventsRes.error;
+
+        const totalCount = totalRes.count ?? 0;
+        const majorCount = majorRes.count ?? 0;
+        const normalCount = Math.max(0, totalCount - majorCount);
+
+        setSummaryStats([
+          { label: "주요 인가/고시", count: majorCount, color: "bg-rose-500", link: "/changes?importance=3" },
+          { label: "일반 공고/열람", count: normalCount, color: "bg-orange-400", link: "/changes?importance=2" },
+          { label: "전체 변화 기록", count: totalCount, color: "bg-emerald-500", link: "/changes" },
+        ]);
+
+        const recentRows = (recentEventsRes.data ?? []) as unknown as Array<{
           id: string;
           project_id: string | null;
           title: string;
@@ -80,11 +80,6 @@ export default function Home() {
           project: { name: string; district: string | null } | null;
         }>;
 
-        setSummaryStats([
-          { ...emptyStats[0], count: statRows.filter((event) => event.importance === 3).length },
-          { ...emptyStats[1], count: statRows.filter((event) => event.importance < 3).length },
-          { ...emptyStats[2], count: statRows.length },
-        ]);
         setRecentUpdates(
           recentRows.map((event) => ({
             id: event.id,
@@ -103,7 +98,7 @@ export default function Home() {
       }
     }
     loadDashboard();
-  }, [today, weekAgo]);
+  }, []);
 
   async function searchProjects(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -235,17 +230,17 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Today's Updates Statistics */}
-        <section className="mt-20 sm:mt-24" aria-labelledby="today-heading">
+        {/* Updates Statistics */}
+        <section className="mt-20 sm:mt-24" aria-labelledby="stats-heading">
           <div className="mb-6 flex items-end justify-between">
             <div>
-              <p className="text-sm text-[#777a76]">{formatDate(today)} 기준</p>
-              <h2 id="today-heading" className="mt-1 text-2xl font-semibold tracking-[-0.04em]">
-                오늘의 변화
+              <p className="text-sm text-[#777a76]">서울시 공공데이터 레이더</p>
+              <h2 id="stats-heading" className="mt-1 text-2xl font-semibold tracking-[-0.04em]">
+                정비사업 변화 현황
               </h2>
             </div>
-            <Link className="text-sm font-medium underline underline-offset-4" href="/changes?period=today">
-              오늘의 변화 전체 보기
+            <Link className="text-sm font-medium underline underline-offset-4 hover:text-[#e6523a]" href="/changes">
+              전체 변화 보기 ↗
             </Link>
           </div>
           {dashboardError ? (
@@ -276,11 +271,14 @@ export default function Home() {
         {/* Recent Updates Feed */}
         <section className="mt-16 pb-12" aria-labelledby="recent-heading">
           <div className="mb-5 flex items-end justify-between">
-            <h2 id="recent-heading" className="text-2xl font-semibold tracking-[-0.04em]">
-              최근 변화 피드
-            </h2>
-            <Link className="text-sm text-[#777a76] underline underline-offset-4 hover:text-[#171918]" href="/changes?period=7d">
-              최근 7일 전체 보기
+            <div>
+              <h2 id="recent-heading" className="text-2xl font-semibold tracking-[-0.04em]">
+                최신 변화 피드
+              </h2>
+              <p className="mt-1 text-xs text-[#777a76]">공고 및 인가 이력이 등록된 최신 순</p>
+            </div>
+            <Link className="text-sm text-[#777a76] underline underline-offset-4 hover:text-[#171918]" href="/changes">
+              전체 피드 보기
             </Link>
           </div>
           <div className="overflow-hidden rounded-2xl border border-black/8 bg-white shadow-[0_8px_30px_rgb(0,0,0,0.02)]">

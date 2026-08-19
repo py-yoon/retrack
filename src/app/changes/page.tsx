@@ -74,7 +74,7 @@ function ChangesContent() {
   const [, startTransition] = useTransition();
 
   // Read initial states from URL search params
-  const initialPeriod = (searchParams.get("period") as Period) || "7d";
+  const initialPeriod = (searchParams.get("period") as Period) || "all";
   const initialDistrict = searchParams.get("district") || "all";
   const initialImportance = searchParams.get("importance") || "all";
   const initialEventType = searchParams.get("event_type") || "all";
@@ -224,7 +224,7 @@ function ChangesContent() {
     setPeriod(newPeriod);
     setPage(1);
     updateUrl({
-      period: newPeriod === "7d" ? undefined : newPeriod,
+      period: newPeriod === "all" ? undefined : newPeriod,
       start_date: newPeriod === "custom" ? customStartDate : undefined,
       end_date: newPeriod === "custom" ? customEndDate : undefined,
       page: 1,
@@ -268,7 +268,7 @@ function ChangesContent() {
   }
 
   function handleResetFilters() {
-    setPeriod("7d");
+    setPeriod("all");
     setCustomStartDate("");
     setCustomEndDate("");
     setDistrict("all");
@@ -283,7 +283,7 @@ function ChangesContent() {
   }
 
   const isFiltered =
-    period !== "7d" ||
+    period !== "all" ||
     district !== "all" ||
     importance !== "all" ||
     eventType !== "all" ||
