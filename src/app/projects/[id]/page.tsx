@@ -27,7 +27,22 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
           <p className="text-sm font-semibold tracking-[0.12em] text-[#e6523a]">PROJECT PROFILE</p>
           <h1 className="mt-3 max-w-3xl text-4xl font-semibold tracking-[-0.055em] sm:text-5xl">{project.name}</h1>
           <p className="mt-4 text-[#6e716e]">{project.address}</p>
-          <div className="mt-8 grid gap-3 sm:grid-cols-3">
+          <div className="mt-8 grid gap-3 sm:grid-cols-4">
+            <div className="rounded-2xl bg-white p-5">
+              <p className="text-xs text-[#777a76]">자치구</p>
+              <p className="mt-2 font-semibold">
+                {project.district ? (
+                  <Link
+                    href={`/changes?district=${encodeURIComponent(project.district)}`}
+                    className="underline-offset-4 hover:underline hover:text-[#e6523a]"
+                  >
+                    {project.district} ↗
+                  </Link>
+                ) : (
+                  "서울시"
+                )}
+              </p>
+            </div>
             <div className="rounded-2xl bg-white p-5"><p className="text-xs text-[#777a76]">현재 단계</p><p className="mt-2 font-semibold">{project.current_status ?? "확인 중"}</p></div>
             <div className="rounded-2xl bg-white p-5"><p className="text-xs text-[#777a76]">사업 유형</p><p className="mt-2 font-semibold">{project.project_type ?? "정비사업"}</p></div>
             <div className="rounded-2xl bg-white p-5"><p className="text-xs text-[#777a76]">업데이트</p><p className="mt-2 font-semibold">{project.updated_at.slice(0, 10).replaceAll("-", ".")}</p></div>
