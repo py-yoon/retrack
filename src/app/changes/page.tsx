@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState, useCallback, useTransition } from "react";
 import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import Header from "@/components/Header";
 import { getSupabaseClient } from "@/lib/supabase/client";
 
 const SEOUL_DISTRICTS = [
@@ -294,14 +295,7 @@ function ChangesContent() {
   return (
     <main className="min-h-screen bg-[#f7f7f4] text-[#171918]">
       <div className="mx-auto max-w-5xl px-6 py-10 sm:px-10 sm:py-14">
-        <header className="flex items-center justify-between border-b border-black/10 pb-6">
-          <Link className="text-lg font-bold tracking-[-0.06em]" href="/">
-            RE:TRACK
-          </Link>
-          <Link className="text-sm text-[#6e716e] underline underline-offset-4 hover:text-[#171918]" href="/">
-            홈 / 검색으로 돌아가기
-          </Link>
-        </header>
+        <Header />
 
         <section className="pt-14">
           <p className="text-sm font-semibold tracking-[0.12em] text-[#e6523a]">CHANGE FEED</p>

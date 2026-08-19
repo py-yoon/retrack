@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import Header from "@/components/Header";
+import SubscriptionButton from "@/components/SubscriptionButton";
 import { getSupabaseClient } from "@/lib/supabase/client";
 
 type ProjectPageProps = { params: Promise<{ id: string }> };
@@ -18,13 +20,13 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
   return (
     <main className="min-h-screen bg-[#f7f7f4] text-[#171918]">
       <div className="mx-auto max-w-5xl px-6 py-10 sm:px-10 sm:py-14">
-        <header className="flex items-center justify-between border-b border-black/10 pb-6">
-          <Link className="text-lg font-bold tracking-[-0.06em]" href="/">RE:TRACK</Link>
-          <Link className="text-sm text-[#6e716e] underline underline-offset-4" href="/">검색으로 돌아가기</Link>
-        </header>
+        <Header />
 
         <section className="pt-14">
-          <p className="text-sm font-semibold tracking-[0.12em] text-[#e6523a]">PROJECT PROFILE</p>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <p className="text-sm font-semibold tracking-[0.12em] text-[#e6523a]">PROJECT PROFILE</p>
+            <SubscriptionButton projectId={project.id} />
+          </div>
           <h1 className="mt-3 max-w-3xl text-4xl font-semibold tracking-[-0.055em] sm:text-5xl">{project.name}</h1>
           <p className="mt-4 text-[#6e716e]">{project.address}</p>
           <div className="mt-8 grid gap-3 sm:grid-cols-4">

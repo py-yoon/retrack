@@ -196,7 +196,7 @@ npx supabase migration list
 
 ## 9. 작업 이력 — 2026-08-19
 
-### P0 및 데이터 인프라 고도화 완료
+### P0, P1, P2 전체 기능 구현 완료
 
 | 변경 | 구현 내용 | 관련 파일 |
 | --- | --- | --- |
@@ -207,24 +207,23 @@ npx supabase migration list
 | 자치구 & 직접 날짜 필터 | 25개 자치구 드롭다운, 커스텀 시작/종료일 Date Input, 중요도/유형/단계 필터 및 초기화 버튼 구현 | `src/app/changes/page.tsx` |
 | URL 파라미터 양방향 연동 | `period`, `district`, `importance`, `page`, `start_date`, `end_date` 등 필터 상태가 브라우저 URL에 실시간 반영 및 북마크/공유 지원 | `src/app/changes/page.tsx` |
 | 홈 & 상세 화면 자치구 연동 | 검색 결과 및 최근 변화 피드에 자치구 뱃지 표시, 인기 자치구 빠른 이동 칩 추가, 사업장 상세에 자치구 프로필 및 지역별 변화 피드 이동 링크 추가 | `src/app/page.tsx`, `src/app/projects/[id]/page.tsx` |
-| 배포 품질 검증 | `npm run lint`, `npm run build` 통과 | 전체 프로젝트 |
+| 데이터 수집 통합 파이프라인 | `npm run data:sync` (전체 원클릭 동기화), `npm run data:audit` (매칭 정합성/오매칭 차단 검수 리포트) 구축 | `scripts/sync-all.mjs`, `scripts/audit-matching.mjs` |
+| 카카오/Google 소셜 로그인 | 개인정보 보관 없는 Supabase OAuth 간편 로그인(카카오, Google) 모달 및 세션 관리 구현 | `src/lib/auth/auth-context.tsx`, `src/components/LoginModal.tsx`, `src/app/auth/callback/route.ts` |
+| 관심 사업장 북마크(구독) | 사업장 상세 화면에서 원클릭으로 관심 사업장 등록/해제 (`SubscriptionButton`) 및 낙관적 UI 업데이트 | `src/components/SubscriptionButton.tsx`, `src/app/projects/[id]/page.tsx` |
+| 내 관심 사업장 피드 (`/my`) | 내가 등록한 사업장 목록과 해당 사업장들의 최신 변화 공고만 모아보는 맞춤형 대시보드 화면 구축 | `src/app/my/page.tsx` |
+| 배포 품질 검증 | `npm run lint`, `npm run build` 오류 0건 통과 | 전체 프로젝트 |
 
 ### 현재 원격 DB 데이터 현황 (2026-08-19 기준)
 
 - 사업장: **4,070개** (자치구 보유: 4,055개 / 99.63%)
 - 이벤트: **592개**
 - 추진 단계: **497개**
+- 마이그레이션: 로컬 4개 마이그레이션 모두 원격 적용 완료 (`20260819000000_handle_new_user_oauth.sql` 포함)
 
-## 10. 바로 이어서 할 일 (P1 / P2)
+## 10. 향후 확장 계획
 
-1. **P1 데이터 품질 및 수집 운영화**:
-   - 일일/정기 수집 파이프라인 자동화 (GitHub Actions 또는 Cron)
-   - 공고-사업장 매칭 알고리즘 고도화 및 미매칭/오매칭 검수 로그 리포트 생성
-2. **P2 개인화 기능 (사용자 기능)**:
-   - Supabase Auth 기반 사용자 회원가입/로그인 (Email / Social OAuth)
-   - 사업장 상세 화면에 '관심 사업장 추가(구독)' 버튼 및 `subscriptions` 테이블 연동
-   - 관심 사업장의 신규 공고/변화만 모아보는 '내 관심 사업장 레이더' 화면 제작
-3. **P3 검색 고도화**:
-   - 자치구 + 사업장명 동시 키워드 검색 지원
-   - 초성 검색 또는 유사 검색(Fuzzy matching) 지원
+1. **자동 수집 스케줄러**: GitHub Actions 또는 Cron을 통한 주기적 `npm run data:sync` 실행
+2. **알림 채널 확장**: 관심 사업장의 중요 공고(중요도 3) 발생 시 이메일/카카오 알림톡 발송
+3. **검색 고도화**: 사업장명 초성 검색 및 자치구+단지명 복합 검색 지원
+
 

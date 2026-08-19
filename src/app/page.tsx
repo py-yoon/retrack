@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
+import Header from "@/components/Header";
 import { getSupabaseClient } from "@/lib/supabase/client";
 
 type RecentUpdate = {
@@ -146,15 +147,7 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-[#f7f7f4] text-[#171918]">
       <div className="mx-auto max-w-5xl px-6 py-10 sm:px-10 sm:py-14">
-        <header className="flex items-center justify-between border-b border-black/10 pb-6">
-          <span className="text-lg font-bold tracking-[-0.06em]">RE:TRACK</span>
-          <div className="flex items-center gap-4">
-            <Link className="text-sm font-medium text-[#171918] hover:underline" href="/changes">
-              변화 피드
-            </Link>
-            <span className="text-sm text-[#6e716e]">서울 정비사업 레이더</span>
-          </div>
-        </header>
+        <Header />
 
         <section className="pt-16 sm:pt-24">
           <p className="mb-3 text-sm font-semibold tracking-[0.12em] text-[#e6523a]">URBAN RENEWAL INTELLIGENCE</p>
