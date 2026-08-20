@@ -22,6 +22,18 @@ const SeoulInteractiveMap = dynamic(
   }
 );
 
+const NaverMapView = dynamic(
+  () => import("@/components/NaverMapView"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center min-h-[480px] bg-[#f5f5f1] rounded-2xl text-xs text-[#777a76] animate-pulse border border-black/5">
+        🗺️ 네이버 지도를 불러오는 중입니다...
+      </div>
+    ),
+  }
+);
+
 const STAGE_FILTERS = [
   { label: "전체", value: "ALL" },
   { label: "🟢 관리처분·착공", value: "ADVANCED" },
@@ -53,6 +65,7 @@ function MapContent() {
   const [selectedStage, setSelectedStage] = useState("ALL");
   const [searchKeyword, setSearchKeyword] = useState("");
   const [selectedProject, setSelectedProject] = useState<MapProject | null>(null);
+  const [mapEngine, setMapEngine] = useState<"naver" | "tile">("naver");
   const [recentOnly, setRecentOnly] = useState(false);
 
   useEffect(() => {
@@ -227,13 +240,36 @@ function MapContent() {
         <section className="mt-6 grid gap-6 lg:grid-cols-12 pb-20">
           {/* Interactive Leaflet Map Visualizer (7 cols) */}
           <div className="lg:col-span-7 flex flex-col rounded-3xl border border-black/8 bg-white p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] min-h-[520px]">
-            <div className="flex items-center justify-between border-b border-black/5 pb-3 mb-3">
+            <div className="flex flex-wrap items-center justify-between border-b border-black/5 pb-3 mb-3 gap-2">
               <div className="flex items-center gap-2">
                 <span className="font-bold text-sm text-[#171918]">서울시 정비사업 공간 분포</span>
-                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
-                  실제 도로·지적도 줌 지원
-                </span>
+                {/* Map Engine Switcher */}
+                <div className="flex items-center rounded-xl bg-black/5 p-0.5 text-[11px] font-bold">
+                  <button
+                    type="button"
+                    onClick={() => setMapEngine("naver")}
+                    className={`rounded-lg px-2.5 py-1 transition ${
+                      mapEngine === "naver"
+                        ? "bg-emerald-600 text-white shadow-xs"
+                        : "text-[#666] hover:text-[#171918]"
+                    }`}
+                  >
+                    네이버 지도
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMapEngine("tile")}
+                    className={`rounded-lg px-2.5 py-1 transition ${
+                      mapEngine === "tile"
+                        ? "bg-[#171918] text-white shadow-xs"
+                        : "text-[#666] hover:text-[#171918]"
+                    }`}
+                  >
+                    인터랙티브 맵
+                  </button>
+                </div>
               </div>
+
               {/* Legend */}
               <div className="flex items-center gap-2 text-[10px] text-[#666]">
                 <span className="flex items-center gap-1">
@@ -249,11 +285,18 @@ function MapContent() {
             </div>
 
             {/* Real Map Canvas */}
-            <div className="flex-1 min-h-[440px]">
+            <div className="flex-1 min-h-[460px]">
               {loading ? (
-                <div className="flex items-center justify-center h-[440px] text-xs text-[#777a76] animate-pulse">
+                <div className="flex items-center justify-center h-[460px] text-xs text-[#777a76] animate-pulse">
                   데이터를 불러오는 중입니다...
                 </div>
+              ) : mapEngine === "naver" ? (
+                <NaverMapView
+                  projects={filteredProjects}
+                  selectedProject={selectedProject}
+                  onSelectProject={setSelectedProject}
+                  selectedDistrict={selectedDistrict}
+                />
               ) : (
                 <SeoulInteractiveMap
                   projects={filteredProjects}
