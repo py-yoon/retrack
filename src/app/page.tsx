@@ -106,7 +106,9 @@ export default function Home() {
     loadDashboard();
   }, []);
 
-  // Debounced search logic with Chosung and multi-token matching
+  const [searchMode, setSearchMode] = useState<"all" | "address">("all");
+
+  // Debounced search logic with Chosung and multi-token matching (supporting lot number / address reverse lookup)
   useEffect(() => {
     const term = query.trim();
     if (!term) return;
@@ -124,7 +126,7 @@ export default function Home() {
           const { data, error } = await supabase
             .from("projects")
             .select("id,name,address,district,project_type,current_status")
-            .limit(400);
+            .limit(500);
 
           if (error) throw error;
 
@@ -134,21 +136,24 @@ export default function Home() {
 
           setResults(matched);
         } else {
-          const tokens = term.split(/\s+/).filter(Boolean);
-          if (tokens.length > 1) {
-            // 다중 키워드 (예: "용산구 한남", "대치 은마")
+          // 지번 / 주소 및 일반 키워드 분해
+          // 예: "대치동 66", "신당동 321", "한남동 686", "전농동 440-9"
+          const cleanTerm = term.replaceAll("번지", "").replaceAll("일대", "").replaceAll("일원", "").trim();
+          const tokens = cleanTerm.split(/\s+/).filter(Boolean);
+
+          if (tokens.length >= 2) {
             const [t1, t2] = tokens;
+            // 지번 + 동명 복합 검색 (address와 name에서 동시 검색)
             const { data, error } = await supabase
               .from("projects")
               .select("id,name,address,district,project_type,current_status")
-              .or(`name.ilike.%${t1}%,address.ilike.%${t1}%,district.ilike.%${t1}%`)
-              .or(`name.ilike.%${t2}%,address.ilike.%${t2}%,district.ilike.%${t2}%`)
+              .or(`address.ilike.%${t1}%${t2}%,address.ilike.%${t2}%${t1}%,name.ilike.%${t1}%${t2}%,and(address.ilike.%${t1}%,address.ilike.%${t2}%),and(name.ilike.%${t1}%,name.ilike.%${t2}%),and(district.ilike.%${t1}%,address.ilike.%${t2}%)`)
               .limit(15);
 
             if (error) throw error;
             setResults(data ?? []);
           } else {
-            // 단일 키워드 검색
+            // 단일 키워드 (동 이름 or 지번 or 단지명)
             const { data, error } = await supabase
               .from("projects")
               .select("id,name,address,district,project_type,current_status")
@@ -203,27 +208,61 @@ export default function Home() {
             서울 정비사업의<br />변화를 가장 먼저.
           </h1>
 
-          <div className="relative mt-10 max-w-2xl">
+          {/* Search Mode Switcher Tabs */}
+          <div className="mt-8 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setSearchMode("all");
+                setQuery("");
+                setResults([]);
+              }}
+              className={`rounded-xl px-3.5 py-1.5 text-xs font-bold transition ${
+                searchMode === "all"
+                  ? "bg-[#171918] text-white shadow-sm"
+                  : "bg-white text-[#666] border border-black/8 hover:bg-[#f7f7f4]"
+              }`}
+            >
+              🔍 전체 (단지명 / 초성)
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSearchMode("address");
+                setQuery("신당동 321");
+              }}
+              className={`rounded-xl px-3.5 py-1.5 text-xs font-bold transition flex items-center gap-1.5 ${
+                searchMode === "address"
+                  ? "bg-emerald-700 text-white shadow-sm"
+                  : "bg-white text-emerald-800 border border-emerald-200 hover:bg-emerald-50"
+              }`}
+            >
+              <span>📍 지번·주소로 구역 찾기</span>
+              <span className="rounded-full bg-emerald-100 px-1.5 py-0.2 text-[10px] text-emerald-900 font-bold">New</span>
+            </button>
+          </div>
+
+          <div className="relative mt-3 max-w-2xl">
             <form onSubmit={handleSearchSubmit}>
               <label
-                className="flex h-16 items-center gap-4 rounded-2xl border border-black/10 bg-white px-5 shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition focus-within:border-black/30"
+                className={`flex h-16 items-center gap-4 rounded-2xl border bg-white px-5 shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition ${
+                  searchMode === "address"
+                    ? "border-emerald-500 ring-2 ring-emerald-100"
+                    : "border-black/10 focus-within:border-black/30"
+                }`}
                 htmlFor="project-search"
               >
-                <svg
-                  aria-hidden="true"
-                  className="h-5 w-5 shrink-0 text-[#777a76]"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  viewBox="0 0 24 24"
-                >
-                  <circle cx="11" cy="11" r="6" />
-                  <path d="m16 16 4 4" />
-                </svg>
+                <span className="text-lg">
+                  {searchMode === "address" ? "📍" : "🔍"}
+                </span>
                 <input
                   id="project-search"
                   className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-[#989b96]"
-                  placeholder="사업장명, 초성(예: ㅎㄴ, ㄷㅊ), 주소, 자치구 검색"
+                  placeholder={
+                    searchMode === "address"
+                      ? "동 이름과 지번을 입력하세요 (예: 신당동 321, 대치동 66, 한남동 686)"
+                      : "사업장명, 초성(예: ㅎㄴ, ㄷㅊ), 지번주소, 자치구 검색"
+                  }
                   type="search"
                   value={query}
                   autoComplete="off"
@@ -248,7 +287,7 @@ export default function Home() {
                       setResults([]);
                     }}
                     className="text-[#989b96] hover:text-[#171918]"
-                    title="검색어 지우기"
+                    aria-label="검색어 지우기"
                   >
                     ✕
                   </button>
@@ -258,6 +297,30 @@ export default function Home() {
                 </kbd>
               </label>
             </form>
+
+            {/* Quick Example Chips for Lot Number Lookup */}
+            <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs text-[#777a76]">
+              <span className="font-semibold text-[#171918]">추천 지번 검색:</span>
+              {[
+                { label: "📍 대치동 66", term: "대치동 66" },
+                { label: "📍 신당동 321", term: "신당동 321" },
+                { label: "📍 전농동 440-9", term: "전농동 440-9" },
+                { label: "📍 길동 298", term: "길동 298" },
+                { label: "📍 하왕십리동 890", term: "하왕십리동 890" },
+              ].map((chip) => (
+                <button
+                  key={chip.term}
+                  type="button"
+                  onClick={() => {
+                    setSearchMode("address");
+                    setQuery(chip.term);
+                  }}
+                  className="rounded-lg bg-white border border-black/8 px-2 py-1 text-[11px] font-medium text-[#555] transition hover:border-black/20 hover:bg-[#f7f7f4]"
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
 
             {searching && (
               <p className="mt-2 text-xs text-[#777a76] animate-pulse">실시간 검색 중...</p>
@@ -281,21 +344,29 @@ export default function Home() {
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2 min-w-0">
-                        {project.district && (
-                          <span className="shrink-0 rounded bg-black/5 px-1.5 py-0.5 text-xs font-semibold text-[#171918]">
-                            {project.district}
+                        {searchMode === "address" ? (
+                          <span className="shrink-0 rounded-md bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-800">
+                            📍 해당 지번 구역
                           </span>
+                        ) : (
+                          project.district && (
+                            <span className="shrink-0 rounded bg-black/5 px-1.5 py-0.5 text-xs font-semibold text-[#171918]">
+                              {project.district}
+                            </span>
+                          )
                         )}
-                        <p className="truncate font-semibold text-[#171918]">{project.name}</p>
+                        <p className="truncate font-bold text-[#171918]">{project.name}</p>
                       </div>
                       {project.current_status && (
-                        <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                        <span className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
                           {project.current_status}
                         </span>
                       )}
                     </div>
                     <div className="mt-1 flex items-center justify-between text-xs text-[#777a76]">
-                      <p className="truncate">{project.address}</p>
+                      <p className={`truncate ${searchMode === "address" ? "font-semibold text-emerald-950" : ""}`}>
+                        {searchMode === "address" ? `📍 구역 지번: ${project.address}` : project.address}
+                      </p>
                       {project.project_type && (
                         <span className="shrink-0 text-[#989b96] ml-2">{project.project_type}</span>
                       )}
