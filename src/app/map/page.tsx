@@ -2,24 +2,25 @@
 
 import { useEffect, useState, useMemo, Suspense } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import Header from "@/components/Header";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { getProjectSpecs } from "@/lib/data/project-specs";
-import { getProjectCoordinates, DISTRICT_COORDINATES } from "@/lib/utils/coordinates";
+import { getProjectCoordinates } from "@/lib/utils/coordinates";
 import { getNaverMapUrl } from "@/lib/utils/map";
+import type { MapProject } from "@/components/SeoulInteractiveMap";
 
-type MapProject = {
-  id: string;
-  name: string;
-  address: string;
-  district: string | null;
-  project_type: string | null;
-  current_status: string | null;
-  updated_at: string;
-  lat: number;
-  lng: number;
-  hasRecentEvent?: boolean;
-};
+const SeoulInteractiveMap = dynamic(
+  () => import("@/components/SeoulInteractiveMap"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center min-h-[480px] bg-[#f5f5f1] rounded-2xl text-xs text-[#777a76] animate-pulse border border-black/5">
+        🗺️ 서울시 지도를 불러오는 중입니다...
+      </div>
+    ),
+  }
+);
 
 const STAGE_FILTERS = [
   { label: "전체", value: "ALL" },
@@ -37,39 +38,12 @@ const SEOUL_DISTRICTS = [
   "중랑구", "강북구", "도봉구", "노원구",
 ];
 
-// Seoul Map bounding box for SVG projection
-const MAP_BOUNDS = {
-  minLat: 37.42,
-  maxLat: 37.70,
-  minLng: 126.75,
-  maxLng: 127.20,
-};
-
-function projectToSvg(lat: number, lng: number, width: number, height: number) {
-  const x = ((lng - MAP_BOUNDS.minLng) / (MAP_BOUNDS.maxLng - MAP_BOUNDS.minLng)) * width;
-  const y = height - ((lat - MAP_BOUNDS.minLat) / (MAP_BOUNDS.maxLat - MAP_BOUNDS.minLat)) * height;
-  return { x, y };
-}
-
 function getStageCategory(status: string | null): "ADVANCED" | "APPROVED" | "UNION" | "DESIGNATED" {
   if (!status) return "DESIGNATED";
   if (/관리처분|착공|준공|분양|철거|이전고시/.test(status)) return "ADVANCED";
   if (/사업시행/.test(status)) return "APPROVED";
   if (/조합설립|추진위/.test(status)) return "UNION";
   return "DESIGNATED";
-}
-
-function getMarkerColor(category: "ADVANCED" | "APPROVED" | "UNION" | "DESIGNATED") {
-  switch (category) {
-    case "ADVANCED":
-      return { fill: "#10b981", border: "#059669", label: "관리처분·착공" };
-    case "APPROVED":
-      return { fill: "#3b82f6", border: "#2563eb", label: "사업시행인가" };
-    case "UNION":
-      return { fill: "#f59e0b", border: "#d97706", label: "조합설립" };
-    case "DESIGNATED":
-      return { fill: "#9ca3af", border: "#6b7280", label: "정비구역" };
-  }
 }
 
 function MapContent() {
@@ -118,7 +92,6 @@ function MapContent() {
 
         setProjects(mapped);
         if (mapped.length > 0) {
-          // Select an iconic project by default
           const defaultProj = mapped.find((p) => p.name.includes("한남3") || p.name.includes("이문1")) || mapped[0];
           setSelectedProject(defaultProj);
         }
@@ -173,12 +146,12 @@ function MapContent() {
         <section className="pt-10">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
-              <p className="text-sm font-semibold tracking-[0.12em] text-[#e6523a]">INTERACTIVE MAP</p>
+              <p className="text-sm font-semibold tracking-[0.12em] text-[#e6523a]">REAL-TIME MAP VIEW</p>
               <h1 className="mt-1 text-3xl font-bold tracking-[-0.055em] sm:text-4xl text-[#171918]">
-                서울 정비사업 핫스팟 지도
+                서울 정비사업 인터랙티브 지도
               </h1>
               <p className="mt-1 text-xs text-[#777a76]">
-                서울시 25개 자치구별 재개발·재건축 사업장의 위치, 추진 단계, 최근 공고 핫스팟을 지도에서 한눈에 확인합니다.
+                실제 서울 지도 위에서 25개 구 정비사업장의 위치를 탐색하고, 네이버 지도 및 사업성 계산기로 연결됩니다.
               </p>
             </div>
             <div className="flex items-center gap-2 text-xs">
@@ -252,13 +225,13 @@ function MapContent() {
 
         {/* Map + List Split Screen */}
         <section className="mt-6 grid gap-6 lg:grid-cols-12 pb-20">
-          {/* Interactive Map Visualizer (7 cols) */}
-          <div className="lg:col-span-7 flex flex-col rounded-3xl border border-black/8 bg-white p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] min-h-[480px]">
+          {/* Interactive Leaflet Map Visualizer (7 cols) */}
+          <div className="lg:col-span-7 flex flex-col rounded-3xl border border-black/8 bg-white p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] min-h-[520px]">
             <div className="flex items-center justify-between border-b border-black/5 pb-3 mb-3">
               <div className="flex items-center gap-2">
                 <span className="font-bold text-sm text-[#171918]">서울시 정비사업 공간 분포</span>
-                <span className="rounded-full bg-black/5 px-2 py-0.5 text-[10px] font-medium text-[#777]">
-                  인터랙티브 핀 맵
+                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                  실제 도로·지적도 줌 지원
                 </span>
               </div>
               {/* Legend */}
@@ -275,101 +248,20 @@ function MapContent() {
               </div>
             </div>
 
-            {/* SVG Map Container */}
-            <div className="relative flex-1 rounded-2xl bg-[#f5f5f1] border border-black/5 overflow-hidden flex items-center justify-center p-2 min-h-[380px]">
+            {/* Real Map Canvas */}
+            <div className="flex-1 min-h-[440px]">
               {loading ? (
-                <div className="text-center text-xs text-[#777a76] animate-pulse">
-                  지도를 불러오는 중입니다...
+                <div className="flex items-center justify-center h-[440px] text-xs text-[#777a76] animate-pulse">
+                  데이터를 불러오는 중입니다...
                 </div>
               ) : (
-                <svg
-                  viewBox="0 0 700 500"
-                  className="w-full h-full max-h-[460px] select-none"
-                >
-                  {/* Background Grid & Han River Line */}
-                  <path
-                    d="M 50,320 Q 200,340 320,300 T 520,290 T 680,260"
-                    fill="none"
-                    stroke="#cbd5e1"
-                    strokeWidth="14"
-                    strokeLinecap="round"
-                    opacity="0.6"
-                  />
-                  <text x="330" y="320" fill="#94a3b8" fontSize="11" fontWeight="bold" opacity="0.8">
-                    한강
-                  </text>
-
-                  {/* District Labels */}
-                  {Object.entries(DISTRICT_COORDINATES).map(([distName, coord]) => {
-                    const pos = projectToSvg(coord.lat, coord.lng, 700, 500);
-                    return (
-                      <text
-                        key={distName}
-                        x={pos.x}
-                        y={pos.y}
-                        fill="#999"
-                        fontSize="9"
-                        fontWeight="600"
-                        textAnchor="middle"
-                        className="pointer-events-none"
-                        opacity="0.6"
-                      >
-                        {distName.replace("구", "")}
-                      </text>
-                    );
-                  })}
-
-                  {/* Project Pins */}
-                  {filteredProjects.map((p) => {
-                    const pos = projectToSvg(p.lat, p.lng, 700, 500);
-                    const category = getStageCategory(p.current_status);
-                    const marker = getMarkerColor(category);
-                    const isSelected = selectedProject?.id === p.id;
-
-                    return (
-                      <g
-                        key={p.id}
-                        transform={`translate(${pos.x}, ${pos.y})`}
-                        onClick={() => setSelectedProject(p)}
-                        className="cursor-pointer transition-transform hover:scale-125"
-                      >
-                        {/* Recent Event Pulse Ring */}
-                        {p.hasRecentEvent && (
-                          <circle
-                            r={isSelected ? "14" : "10"}
-                            fill={marker.fill}
-                            opacity="0.3"
-                            className="animate-ping"
-                          />
-                        )}
-
-                        {/* Selected Indicator */}
-                        {isSelected && (
-                          <circle
-                            r="12"
-                            fill="none"
-                            stroke="#e6523a"
-                            strokeWidth="2.5"
-                          />
-                        )}
-
-                        {/* Pin Dot */}
-                        <circle
-                          r={isSelected ? "6.5" : "4.5"}
-                          fill={marker.fill}
-                          stroke="#ffffff"
-                          strokeWidth="1.5"
-                        />
-                      </g>
-                    );
-                  })}
-                </svg>
+                <SeoulInteractiveMap
+                  projects={filteredProjects}
+                  selectedProject={selectedProject}
+                  onSelectProject={setSelectedProject}
+                  selectedDistrict={selectedDistrict}
+                />
               )}
-
-              {/* Map Footer Hint */}
-              <div className="absolute bottom-2 left-2 rounded-lg bg-white/80 backdrop-blur-xs px-2.5 py-1 text-[10px] text-[#666] border border-black/5">
-                💡 핀을 클릭하면 상세 사업성 및 분담금 계산기로 바로 연결됩니다.
-              </div>
             </div>
           </div>
 
@@ -420,7 +312,7 @@ function MapContent() {
                       href={`/compare?p1=${selectedProject.id}`}
                       className="flex-1 text-center rounded-xl border border-black/10 bg-[#f7f7f4] py-2 text-xs font-bold text-[#333] transition hover:bg-black/5"
                     >
-                      ⚔️ 다른 구역과 비교
+                      ⚔️ 1:1 비교하기
                     </Link>
 
                     <a
