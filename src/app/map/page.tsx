@@ -75,7 +75,7 @@ function MapContent() {
         const recentProjectIds = new Set((eData ?? []).map((e) => e.project_id).filter(Boolean));
 
         const mapped: MapProject[] = (pData ?? []).map((p) => {
-          const coords = getProjectCoordinates(p.id, p.district, p.latitude, p.longitude);
+          const coords = getProjectCoordinates(p.id, p.district, p.latitude, p.longitude, p.address);
           return {
             id: p.id,
             name: p.name,

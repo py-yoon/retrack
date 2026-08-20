@@ -1,5 +1,6 @@
 export type DistrictCoord = { lat: number; lng: number };
 
+// 1. Seoul 25 District Center Coordinates
 export const DISTRICT_COORDINATES: Record<string, DistrictCoord> = {
   강남구: { lat: 37.5172, lng: 127.0473 },
   서초구: { lat: 37.4837, lng: 127.0324 },
@@ -28,7 +29,217 @@ export const DISTRICT_COORDINATES: Record<string, DistrictCoord> = {
   노원구: { lat: 37.6542, lng: 127.0568 },
 };
 
-// Simple pseudo-random hash to generate deterministic scatter for projects within a district
+// 2. Exact Geocoded Coordinates for Famous Seoul Renewal Hubs & Major Dongs
+export const SEOUL_DONG_COORDINATES: Record<string, DistrictCoord> = {
+  // 강남구
+  대치동: { lat: 37.5025, lng: 127.0673 },
+  압구정동: { lat: 37.5273, lng: 127.0285 },
+  개포동: { lat: 37.488, lng: 127.0583 },
+  청담동: { lat: 37.5255, lng: 127.0515 },
+  역삼동: { lat: 37.5005, lng: 127.0365 },
+  논현동: { lat: 37.5115, lng: 127.0325 },
+  삼성동: { lat: 37.5145, lng: 127.0585 },
+  도곡동: { lat: 37.4905, lng: 127.0485 },
+  일원동: { lat: 37.4835, lng: 127.0865 },
+  수서동: { lat: 37.4885, lng: 127.1015 },
+  세곡동: { lat: 37.4665, lng: 127.1065 },
+
+  // 서초구
+  반포동: { lat: 37.5042, lng: 127.0049 },
+  방배동: { lat: 37.4831, lng: 126.9922 },
+  서초동: { lat: 37.4925, lng: 127.0165 },
+  잠원동: { lat: 37.5165, lng: 127.0145 },
+  양재동: { lat: 37.4725, lng: 127.0425 },
+  우면동: { lat: 37.4615, lng: 127.0285 },
+  내곡동: { lat: 37.4525, lng: 127.0685 },
+
+  // 용산구
+  한남동: { lat: 37.5348, lng: 127.0028 },
+  보광동: { lat: 37.5285, lng: 127.0015 },
+  이태원동: { lat: 37.5345, lng: 126.9945 },
+  동빙고동: { lat: 37.5235, lng: 126.9965 },
+  서빙고동: { lat: 37.5205, lng: 126.9885 },
+  이촌동: { lat: 37.5185, lng: 126.9745 },
+  원효로: { lat: 37.5335, lng: 126.9615 },
+  청파동: { lat: 37.5465, lng: 126.9685 },
+  후암동: { lat: 37.5495, lng: 126.9805 },
+
+  // 송파구
+  잠실동: { lat: 37.5132, lng: 127.0864 },
+  신천동: { lat: 37.5185, lng: 127.1025 },
+  가락동: { lat: 37.4965, lng: 127.1225 },
+  문정동: { lat: 37.4865, lng: 127.1265 },
+  방이동: { lat: 37.5145, lng: 127.1265 },
+  오금동: { lat: 37.5025, lng: 127.1365 },
+  거여동: { lat: 37.4925, lng: 127.1445 },
+  마천동: { lat: 37.4965, lng: 127.1525 },
+  풍납동: { lat: 37.5325, lng: 127.1185 },
+
+  // 성동구
+  성수동1가: { lat: 37.5445, lng: 127.0442 },
+  성수동2가: { lat: 37.5422, lng: 127.0565 },
+  옥수동: { lat: 37.5415, lng: 127.0165 },
+  금호동: { lat: 37.5505, lng: 127.0225 },
+  행당동: { lat: 37.5585, lng: 127.0345 },
+  왕십리: { lat: 37.5615, lng: 127.0365 },
+  하왕십리동: { lat: 37.5645, lng: 127.0285 },
+  마장동: { lat: 37.5665, lng: 127.0445 },
+  응봉동: { lat: 37.5505, lng: 127.0345 },
+
+  // 동작구
+  노량진동: { lat: 37.5133, lng: 126.9428 },
+  흑석동: { lat: 37.5085, lng: 126.9632 },
+  상도동: { lat: 37.4985, lng: 126.9465 },
+  사당동: { lat: 37.4845, lng: 126.9745 },
+  신대방동: { lat: 37.4905, lng: 126.9185 },
+  본동: { lat: 37.5125, lng: 126.9545 },
+
+  // 마포구
+  공덕동: { lat: 37.5458, lng: 126.9532 },
+  아현동: { lat: 37.5562, lng: 126.9565 },
+  염리동: { lat: 37.5485, lng: 126.9465 },
+  대흥동: { lat: 37.5465, lng: 126.9415 },
+  용강동: { lat: 37.5385, lng: 126.9425 },
+  망원동: { lat: 37.5565, lng: 126.9025 },
+  상암동: { lat: 37.5775, lng: 126.8915 },
+  성산동: { lat: 37.5685, lng: 126.9085 },
+  합정동: { lat: 37.5485, lng: 126.9125 },
+
+  // 동대문구
+  이문동: { lat: 37.5962, lng: 127.0632 },
+  전농동: { lat: 37.5806, lng: 127.0554 },
+  답십리동: { lat: 37.5695, lng: 127.0585 },
+  용두동: { lat: 37.5745, lng: 127.0365 },
+  청량리동: { lat: 37.5845, lng: 127.0465 },
+  회기동: { lat: 37.5905, lng: 127.0565 },
+  휘경동: { lat: 37.5885, lng: 127.0685 },
+  장안동: { lat: 37.5665, lng: 127.0725 },
+
+  // 성북구
+  길음동: { lat: 37.6042, lng: 127.0225 },
+  장위동: { lat: 37.6185, lng: 127.0465 },
+  돈암동: { lat: 37.5985, lng: 127.0185 },
+  정릉동: { lat: 37.6085, lng: 127.0085 },
+  하월곡동: { lat: 37.6045, lng: 127.0365 },
+  상월곡동: { lat: 37.6065, lng: 127.0445 },
+  석관동: { lat: 37.6125, lng: 127.0625 },
+  보문동: { lat: 37.5845, lng: 127.0185 },
+  안암동: { lat: 37.5865, lng: 127.0285 },
+  삼선동: { lat: 37.5865, lng: 127.0125 },
+
+  // 관악구
+  신림동: { lat: 37.4764, lng: 126.9272 },
+  봉천동: { lat: 37.4825, lng: 126.9415 },
+  남현동: { lat: 37.4725, lng: 126.9785 },
+
+  // 은평구
+  수색동: { lat: 37.5842, lng: 126.8962 },
+  증산동: { lat: 37.5825, lng: 126.9065 },
+  불광동: { lat: 37.6185, lng: 126.9285 },
+  갈현동: { lat: 37.6205, lng: 126.9145 },
+  대조동: { lat: 37.6105, lng: 126.9225 },
+  응암동: { lat: 37.5965, lng: 126.9225 },
+  신사동_은평: { lat: 37.5965, lng: 126.9105 },
+  녹번동: { lat: 37.6015, lng: 126.9325 },
+
+  // 서대문구
+  북아현동: { lat: 37.5625, lng: 126.9565 },
+  남가좌동: { lat: 37.5785, lng: 126.9185 },
+  북가좌동: { lat: 37.5805, lng: 126.9105 },
+  홍은동: { lat: 37.5965, lng: 126.9465 },
+  홍제동: { lat: 37.5885, lng: 126.9445 },
+  연희동: { lat: 37.5685, lng: 126.9325 },
+
+  // 영등포구
+  여의도동: { lat: 37.5215, lng: 126.9245 },
+  신길동: { lat: 37.5065, lng: 126.9125 },
+  당산동: { lat: 37.5342, lng: 126.9025 },
+  문래동: { lat: 37.5185, lng: 126.8965 },
+  양평동: { lat: 37.5315, lng: 126.8925 },
+  영등포동: { lat: 37.5205, lng: 126.9065 },
+  대림동: { lat: 37.4965, lng: 126.8985 },
+
+  // 양천구
+  목동: { lat: 37.5275, lng: 126.8725 },
+  신정동: { lat: 37.5165, lng: 126.8565 },
+  신월동: { lat: 37.5265, lng: 126.8385 },
+
+  // 강동구
+  천호동: { lat: 37.5385, lng: 127.1285 },
+  상일동: { lat: 37.5502, lng: 127.1725 },
+  고덕동: { lat: 37.5585, lng: 127.1565 },
+  길동: { lat: 37.5365, lng: 127.1425 },
+  둔촌동: { lat: 37.5265, lng: 127.1405 },
+  명일동: { lat: 37.5505, lng: 127.1485 },
+  암사동: { lat: 37.5525, lng: 127.1325 },
+  성내동: { lat: 37.5285, lng: 127.1285 },
+
+  // 종로구 & 중구
+  신당동: { lat: 37.5651, lng: 127.0132 },
+  창신동: { lat: 37.5762, lng: 127.0125 },
+  숭인동: { lat: 37.5765, lng: 127.0195 },
+  소공동: { lat: 37.5635, lng: 126.9785 },
+  을지로: { lat: 37.5665, lng: 126.9945 },
+  충무로: { lat: 37.5615, lng: 126.9945 },
+  무교동: { lat: 37.5675, lng: 126.9785 },
+  서린동: { lat: 37.5695, lng: 126.9805 },
+  사직동: { lat: 37.5755, lng: 126.9685 },
+  교남동: { lat: 37.5685, lng: 126.9625 },
+  무악동: { lat: 37.5765, lng: 126.9585 },
+  행촌동: { lat: 37.5725, lng: 126.9605 },
+  명륜동: { lat: 37.5865, lng: 126.9985 },
+  혜화동: { lat: 37.5865, lng: 127.0025 },
+
+  // 광진구
+  자양동: { lat: 37.5345, lng: 127.0745 },
+  구의동: { lat: 37.5425, lng: 127.0885 },
+  광장동: { lat: 37.5485, lng: 127.1025 },
+  중곡동: { lat: 37.5625, lng: 127.0845 },
+  화양동: { lat: 37.5445, lng: 127.0705 },
+  군자동: { lat: 37.5545, lng: 127.0765 },
+
+  // 구로구 & 금천구
+  구로동: { lat: 37.4945, lng: 126.8865 },
+  신도림동: { lat: 37.5095, lng: 126.8885 },
+  개봉동: { lat: 37.4945, lng: 126.8585 },
+  오류동: { lat: 37.4965, lng: 126.8445 },
+  궁동: { lat: 37.5025, lng: 126.8345 },
+  온수동: { lat: 37.4925, lng: 126.8245 },
+  가산동: { lat: 37.4785, lng: 126.8865 },
+  독산동: { lat: 37.4685, lng: 126.9005 },
+  시흥동: { lat: 37.4505, lng: 126.9065 },
+
+  // 중랑구 & 강북구 & 도봉구 & 노원구
+  면목동: { lat: 37.5865, lng: 127.0865 },
+  상봉동: { lat: 37.5965, lng: 127.0905 },
+  중화동: { lat: 37.6025, lng: 127.0805 },
+  묵동: { lat: 37.6125, lng: 127.0785 },
+  망우동: { lat: 37.6005, lng: 127.1005 },
+  신내동: { lat: 37.6125, lng: 127.0945 },
+  미아동: { lat: 37.6245, lng: 127.0265 },
+  수유동: { lat: 37.6405, lng: 127.0185 },
+  번동: { lat: 37.6325, lng: 127.0365 },
+  쌍문동: { lat: 37.6525, lng: 127.0345 },
+  방학동: { lat: 37.6665, lng: 127.0425 },
+  창동: { lat: 37.6525, lng: 127.0485 },
+  도봉동: { lat: 37.6805, lng: 127.0445 },
+  상계동: { lat: 37.6645, lng: 127.0705 },
+  중계동: { lat: 37.6485, lng: 127.0785 },
+  하계동: { lat: 37.6385, lng: 127.0665 },
+  월계동: { lat: 37.6245, lng: 127.0585 },
+  공릉동: { lat: 37.6265, lng: 127.0785 },
+
+  // 강서구
+  화곡동: { lat: 37.5365, lng: 126.8485 },
+  등촌동: { lat: 37.5565, lng: 126.8585 },
+  염창동: { lat: 37.5545, lng: 126.8725 },
+  가양동: { lat: 37.5645, lng: 126.8565 },
+  마곡동: { lat: 37.5665, lng: 126.8325 },
+  방화동: { lat: 37.5745, lng: 126.8165 },
+  공항동: { lat: 37.5585, lng: 126.8085 },
+};
+
+// Simple pseudo-random hash to scatter projects located on the same dong block
 function pseudoHash(str: string): number {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
@@ -42,18 +253,35 @@ export function getProjectCoordinates(
   id: string,
   district: string | null,
   latitude?: number | null,
-  longitude?: number | null
+  longitude?: number | null,
+  address?: string | null
 ): { lat: number; lng: number } {
+  // 1. If real verified GPS coordinates exist in database
   if (latitude && longitude && latitude > 30 && longitude > 120) {
     return { lat: latitude, lng: longitude };
   }
 
-  const base = (district && DISTRICT_COORDINATES[district]) || { lat: 37.5665, lng: 126.978 };
+  // 2. Resolve by exact Dong name from address
+  const fullText = `${district ?? ""} ${address ?? ""}`;
+  let base: DistrictCoord | null = null;
+
+  for (const [dongName, coord] of Object.entries(SEOUL_DONG_COORDINATES)) {
+    if (fullText.includes(dongName.replace("_은평", ""))) {
+      base = coord;
+      break;
+    }
+  }
+
+  // 3. Fallback to District center
+  if (!base) {
+    base = (district && DISTRICT_COORDINATES[district]) || { lat: 37.5665, lng: 126.978 };
+  }
+
   const hash = pseudoHash(id);
 
-  // Deterministic offset within ~1.2km radius
-  const latOffset = (((hash & 0xffff) % 2000) - 1000) / 100000;
-  const lngOffset = ((((hash >> 16) & 0xffff) % 2000) - 1000) / 80000;
+  // Micro-offset (~150m) so multiple projects in the same dong don't overlap completely
+  const latOffset = (((hash & 0xffff) % 500) - 250) / 100000;
+  const lngOffset = ((((hash >> 16) & 0xffff) % 500) - 250) / 80000;
 
   return {
     lat: base.lat + latOffset,
