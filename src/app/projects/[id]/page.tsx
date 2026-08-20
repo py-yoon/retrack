@@ -8,6 +8,7 @@ import FeasibilityCalculator from "@/components/FeasibilityCalculator";
 import ProjectEventsTimeline from "@/components/ProjectEventsTimeline";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { calculateStagePipeline } from "@/lib/utils/stages";
+import { getNaverMapUrl } from "@/lib/utils/map";
 
 type ProjectPageProps = { params: Promise<{ id: string }> };
 
@@ -28,6 +29,8 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
     events
   );
 
+  const naverMapUrl = getNaverMapUrl(project.district, project.address, project.name);
+
   return (
     <main className="min-h-screen bg-[#f7f7f4] text-[#171918]">
       <div className="mx-auto max-w-5xl px-6 py-10 sm:px-10 sm:py-14">
@@ -43,7 +46,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <p className="text-[#6e716e]">{project.address}</p>
             <a
-              href={`https://map.naver.com/p/search/${encodeURIComponent(`${project.district ?? ""} ${project.address || project.name}`.trim())}`}
+              href={naverMapUrl}
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-600/20 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-800 transition hover:bg-emerald-100 shadow-2xs"

@@ -5,6 +5,7 @@ import Link from "next/link";
 import Header from "@/components/Header";
 import { useAuth } from "@/lib/auth/auth-context";
 import { getSupabaseClient } from "@/lib/supabase/client";
+import { getNaverMapUrl } from "@/lib/utils/map";
 
 type SubscribedProject = {
   id: string;
@@ -539,7 +540,7 @@ export default function MyRadarPage() {
                                 <div className="flex items-center gap-2">
                                   <span className="text-[#6e716e]">{project.project_type ?? "정비사업"}</span>
                                   <a
-                                    href={`https://map.naver.com/p/search/${encodeURIComponent(`${project.district ?? ""} ${project.address || project.name}`.trim())}`}
+                                    href={getNaverMapUrl(project.district, project.address, project.name)}
                                     target="_blank"
                                     rel="noreferrer"
                                     className="font-medium text-emerald-700 hover:underline"
