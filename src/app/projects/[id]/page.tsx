@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import Header from "@/components/Header";
 import SubscriptionButton from "@/components/SubscriptionButton";
 import StagePipeline from "@/components/StagePipeline";
+import ProjectSpecsCard from "@/components/ProjectSpecsCard";
+import FeasibilityCalculator from "@/components/FeasibilityCalculator";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { calculateStagePipeline } from "@/lib/utils/stages";
 
@@ -30,6 +32,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
       <div className="mx-auto max-w-5xl px-6 py-10 sm:px-10 sm:py-14">
         <Header />
 
+        {/* Project Header Profile */}
         <section className="pt-14">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <p className="text-sm font-semibold tracking-[0.12em] text-[#e6523a]">PROJECT PROFILE</p>
@@ -69,7 +72,28 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
           </div>
         </section>
 
-        <section className="mt-12 grid gap-8 lg:grid-cols-[1.1fr_1.3fr] items-start">
+        {/* Section 1: Specs & Architectural Design */}
+        <section className="mt-10">
+          <ProjectSpecsCard
+            projectName={project.name}
+            district={project.district}
+            projectType={project.project_type}
+            currentStatus={project.current_status}
+          />
+        </section>
+
+        {/* Section 2: Feasibility & Additional Contribution ROI Simulator */}
+        <section className="mt-10">
+          <FeasibilityCalculator
+            projectName={project.name}
+            district={project.district}
+            projectType={project.project_type}
+            currentStatus={project.current_status}
+          />
+        </section>
+
+        {/* Section 3: Stage Pipeline & Events Timeline */}
+        <section className="mt-10 grid gap-8 lg:grid-cols-[1.1fr_1.3fr] items-start">
           {/* 7-Step Stage Pipeline */}
           <div>
             <StagePipeline steps={pipeline} currentStatus={project.current_status} />
@@ -115,7 +139,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
                           <div className="mt-3 rounded-xl border border-amber-200/80 bg-amber-50/60 p-3 text-xs text-[#333]">
                             <div className="flex items-center gap-1.5 font-bold text-amber-900 mb-1">
                               <span>💡 AI 핵심 변경점 요약</span>
-                              <span className="rounded bg-amber-200/80 px-1 py-0.2 text-[10px] text-amber-900">Pro</span>
+                              <span className="rounded bg-amber-200/80 px-1 py-0.2 text-[10px] text-amber-900">핵심</span>
                             </div>
                             <p className="text-[#555] leading-relaxed">
                               • 본 사업장의 {event.title.includes("인가") ? "인가 절차" : "정비계획 변경"}가 서울시/구청에 공식 고시되었습니다.<br />

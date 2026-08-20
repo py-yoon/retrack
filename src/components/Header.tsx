@@ -37,25 +37,10 @@ export default function Header() {
           >
             내 관심 사업장
           </Link>
-          <Link
-            className={`transition ${
-              pathname === "/pricing" ? "font-semibold text-[#e6523a]" : "text-[#444] hover:text-[#171918]"
-            }`}
-            href="/pricing"
-          >
-            요금제
-          </Link>
         </nav>
       </div>
 
       <div className="flex items-center gap-2.5">
-        <Link
-          href="/pricing"
-          className="hidden sm:flex items-center gap-1 rounded-xl bg-amber-50 border border-amber-200/80 px-2.5 py-1.5 text-xs font-semibold text-amber-900 transition hover:bg-amber-100"
-        >
-          <span>👑</span>
-          <span>Pro 혜택</span>
-        </Link>
 
         {loading ? (
           <div className="h-8 w-16 animate-pulse rounded-lg bg-black/5" />

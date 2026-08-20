@@ -244,45 +244,23 @@ export default function MyRadarPage() {
         {user && (
           <>
             {/* Membership & Status Banner */}
-            <div className="mt-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-3xl border border-black/8 bg-white p-5 sm:p-6 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
+            <div className="mt-8 flex items-center justify-between gap-4 rounded-3xl border border-black/8 bg-white p-5 sm:p-6 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
               <div className="flex items-center gap-3.5">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-50 text-xl text-amber-600 font-bold">
-                  {userTier === "free" ? "⭐" : "👑"}
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-xl text-emerald-600 font-bold">
+                  ⭐
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-base text-[#171918]">
-                      {userTier === "free" ? "Free 플랜" : userTier === "pro" ? "Pro 멤버십" : "Business 플랜"}
-                    </span>
-                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                      userTier === "free" ? "bg-black/5 text-[#777a76]" : "bg-rose-50 text-[#e6523a]"
-                    }`}>
-                      {userTier === "free" ? `3개 중 ${projects.length}개 등록 중` : "무제한 등록 & 실시간 알림 활성"}
+                    <span className="font-bold text-base text-[#171918]">내 정비사업 레이더</span>
+                    <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                      {projects.length}개 사업장 모니터링 중
                     </span>
                   </div>
                   <p className="mt-0.5 text-xs text-[#6e716e]">
-                    {userTier === "free"
-                      ? "Pro로 업그레이드하면 관심 사업장 무제한 등록과 카카오 알림톡을 받으실 수 있습니다."
-                      : "관심 사업장의 중요 고시공고가 발생하면 등록된 휴대폰으로 알림톡이 즉시 발송됩니다."}
+                    관심 사업장의 중요 고시공고가 발생하면 실시간으로 감지하여 피드를 업데이트합니다.
                   </p>
                 </div>
               </div>
-
-              {userTier === "free" ? (
-                <Link
-                  href="/pricing"
-                  className="inline-flex shrink-0 items-center justify-center rounded-xl bg-[#171918] px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-black"
-                >
-                  ⚡ Pro 업그레이드 (월 14,900원) ➔
-                </Link>
-              ) : (
-                <Link
-                  href="/pricing"
-                  className="inline-flex shrink-0 items-center justify-center rounded-xl border border-black/10 bg-[#f7f7f4] px-4 py-2 text-xs font-semibold text-[#171918] hover:bg-white"
-                >
-                  멤버십 관리
-                </Link>
-              )}
             </div>
 
             {/* KPI Summary Cards */}
