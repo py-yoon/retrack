@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Header from "@/components/Header";
+import NewsSection from "@/components/NewsSection";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { isPureChosung, matchHangulSearch } from "@/lib/utils/hangul";
 
@@ -493,6 +494,9 @@ export default function Home() {
             ))}
           </div>
         </section>
+
+        {/* Real-time Urban Renewal News Feed */}
+        <NewsSection />
       </div>
     </main>
   );
