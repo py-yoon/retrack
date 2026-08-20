@@ -40,7 +40,18 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
             <SubscriptionButton projectId={project.id} />
           </div>
           <h1 className="mt-3 max-w-3xl text-4xl font-semibold tracking-[-0.055em] sm:text-5xl">{project.name}</h1>
-          <p className="mt-4 text-[#6e716e]">{project.address}</p>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <p className="text-[#6e716e]">{project.address}</p>
+            <a
+              href={`https://map.naver.com/p/search/${encodeURIComponent(`${project.district ?? ""} ${project.address || project.name}`.trim())}`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-600/20 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-800 transition hover:bg-emerald-100 shadow-2xs"
+            >
+              <span className="text-sm">🗺️</span>
+              <span>네이버 지도로 위치 보기 ↗</span>
+            </a>
+          </div>
 
           <div className="mt-8 grid gap-3 sm:grid-cols-4">
             <div className="rounded-2xl border border-black/8 bg-white p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">

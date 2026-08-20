@@ -536,7 +536,18 @@ export default function MyRadarPage() {
                               </div>
 
                               <div className="mt-4 flex items-center justify-between border-t border-black/5 pt-3 text-xs">
-                                <span className="text-[#6e716e]">{project.project_type ?? "정비사업"}</span>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[#6e716e]">{project.project_type ?? "정비사업"}</span>
+                                  <a
+                                    href={`https://map.naver.com/p/search/${encodeURIComponent(`${project.district ?? ""} ${project.address || project.name}`.trim())}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="font-medium text-emerald-700 hover:underline"
+                                    title="네이버 지도에서 보기"
+                                  >
+                                    🗺️ 지도보기 ↗
+                                  </a>
+                                </div>
                                 <span className="font-semibold text-emerald-700">
                                   {project.current_status ?? "단계 확인 중"}
                                 </span>
