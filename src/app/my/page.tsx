@@ -41,6 +41,7 @@ export default function MyRadarPage() {
   const [activeTab, setActiveTab] = useState<"feed" | "projects" | "settings">("feed");
   const [onlyMajor, setOnlyMajor] = useState(false);
   const [projectSearchTerm, setProjectSearchTerm] = useState("");
+  const [feedVisibleCount, setFeedVisibleCount] = useState(5);
   const [userTier, setUserTier] = useState<"free" | "pro" | "business">("free");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [notifyKakao, setNotifyKakao] = useState(true);
@@ -364,82 +365,111 @@ export default function MyRadarPage() {
                         </div>
                       </div>
                     ) : (() => {
-                      const displayedEvents = onlyMajor ? events.filter(e => e.importance === 3) : events;
-                      if (displayedEvents.length === 0) {
+                      const filtered = onlyMajor ? events.filter(e => e.importance === 3) : events;
+                      if (filtered.length === 0) {
                         return (
                           <div className="rounded-2xl bg-white p-8 text-center text-sm text-[#777a76]">
                             {onlyMajor ? "등록된 관심 사업장에 중요 공고(중요도 3)가 없습니다." : "등록된 관심 사업장에 최근 발생한 변화 공고가 없습니다."}
                           </div>
                         );
                       }
+                      const sliced = filtered.slice(0, feedVisibleCount);
+                      const hasMore = feedVisibleCount < filtered.length;
+                      const isExpanded = feedVisibleCount > 5 && feedVisibleCount >= filtered.length;
+
                       return (
                         <div className="overflow-hidden rounded-2xl border border-black/8 bg-white shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
-                          {displayedEvents.map((event, index) => (
-                            <article
-                              key={event.id}
-                              className={`flex items-start gap-4 p-5 sm:p-6 transition hover:bg-[#fcfcfa] ${
-                                index !== displayedEvents.length - 1 ? "border-b border-black/7" : ""
-                              }`}
-                            >
-                              <span
-                                className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${
-                                  event.importance === 3 ? "bg-rose-500" : "bg-orange-400"
-                                }`}
-                              />
-                              <div className="min-w-0 flex-1">
-                                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-[#777a76]">
-                                  <time className="font-mono">{formatDate(event.occurred_at)}</time>
-                                  {event.district && (
+                          <div className="divide-y divide-black/7">
+                            {sliced.map((event) => (
+                              <article
+                                key={event.id}
+                                className="flex items-start gap-4 p-5 sm:p-6 transition hover:bg-[#fcfcfa]"
+                              >
+                                <span
+                                  className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${
+                                    event.importance === 3 ? "bg-rose-500" : "bg-orange-400"
+                                  }`}
+                                />
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-[#777a76]">
+                                    <time className="font-mono">{formatDate(event.occurred_at)}</time>
+                                    {event.district && (
+                                      <span className="rounded-md bg-black/5 px-2 py-0.5 font-medium text-[#171918]">
+                                        {event.district}
+                                      </span>
+                                    )}
                                     <span className="rounded-md bg-black/5 px-2 py-0.5 font-medium text-[#171918]">
-                                      {event.district}
+                                      {event.event_type}
                                     </span>
-                                  )}
-                                  <span className="rounded-md bg-black/5 px-2 py-0.5 font-medium text-[#171918]">
-                                    {event.event_type}
-                                  </span>
-                                  {event.importance === 3 && (
-                                    <span className="font-semibold text-rose-600">중요</span>
-                                  )}
-                                </div>
-
-                                <Link
-                                  className="mt-2 block font-semibold leading-6 tracking-tight text-[#171918] underline-offset-4 hover:underline"
-                                  href={`/projects/${event.project_id}`}
-                                >
-                                  {event.project_name}
-                                </Link>
-                                <p className="mt-1 text-sm leading-relaxed text-[#444]">{event.title}</p>
-
-                                {/* AI 3줄 요약 미리보기 */}
-                                {event.importance === 3 && (
-                                  <div className="mt-3 rounded-xl border border-amber-200/80 bg-amber-50/60 p-3 text-xs text-[#333]">
-                                    <div className="flex items-center gap-1.5 font-bold text-amber-900 mb-1">
-                                      <span>💡 AI 핵심 요약</span>
-                                      <span className="rounded bg-amber-200/80 px-1 py-0.2 text-[10px] text-amber-900">Pro</span>
-                                    </div>
-                                    <p className="text-[#555] leading-relaxed">
-                                      • 서울시 고시 기준 사업시행/관리처분 인가 절차가 진행되었습니다.<br />
-                                      • 용적률 및 정비구역 세부 변경 사항은 하단 원문 고시문에서 직접 확인 가능합니다.
-                                    </p>
+                                    {event.importance === 3 && (
+                                      <span className="font-semibold text-rose-600">중요</span>
+                                    )}
                                   </div>
-                                )}
 
-                                <div className="mt-2.5 flex flex-wrap gap-x-3 gap-y-1 text-xs text-[#777a76]">
-                                  <span>{event.source_name ?? "출처 정보 없음"}</span>
-                                  {event.source_url && (
-                                    <a
-                                      className="underline underline-offset-4 hover:text-[#171918]"
-                                      href={event.source_url}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                    >
-                                      원문 보기 ↗
-                                    </a>
+                                  <Link
+                                    className="mt-2 block font-semibold leading-6 tracking-tight text-[#171918] underline-offset-4 hover:underline"
+                                    href={`/projects/${event.project_id}`}
+                                  >
+                                    {event.project_name}
+                                  </Link>
+                                  <p className="mt-1 text-sm leading-relaxed text-[#444]">{event.title}</p>
+
+                                  {/* AI 3줄 요약 미리보기 */}
+                                  {event.importance === 3 && (
+                                    <div className="mt-3 rounded-xl border border-amber-200/80 bg-amber-50/60 p-3 text-xs text-[#333]">
+                                      <div className="flex items-center gap-1.5 font-bold text-amber-900 mb-1">
+                                        <span>💡 AI 핵심 요약</span>
+                                        <span className="rounded bg-amber-200/80 px-1 py-0.2 text-[10px] text-amber-900">핵심</span>
+                                      </div>
+                                      <p className="text-[#555] leading-relaxed">
+                                        • 서울시 고시 기준 사업시행/관리처분 인가 절차가 진행되었습니다.<br />
+                                        • 용적률 및 정비구역 세부 변경 사항은 하단 원문 고시문에서 직접 확인 가능합니다.
+                                      </p>
+                                    </div>
                                   )}
+
+                                  <div className="mt-2.5 flex flex-wrap gap-x-3 gap-y-1 text-xs text-[#777a76]">
+                                    <span>{event.source_name ?? "출처 정보 없음"}</span>
+                                    {event.source_url && (
+                                      <a
+                                        className="underline underline-offset-4 hover:text-[#171918]"
+                                        href={event.source_url}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                      >
+                                        원문 보기 ↗
+                                      </a>
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
-                            </article>
-                          ))}
+                              </article>
+                            ))}
+                          </div>
+
+                          {(hasMore || isExpanded) && (
+                            <div className="border-t border-black/7 bg-[#fcfcfa] p-4 text-center">
+                              {hasMore ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setFeedVisibleCount(prev => prev + 5)}
+                                  className="inline-flex items-center gap-1.5 rounded-xl border border-black/10 bg-white px-5 py-2.5 text-xs font-bold text-[#171918] shadow-xs transition hover:bg-[#f7f7f4] active:scale-[0.98]"
+                                >
+                                  <span>변화 공고 더보기</span>
+                                  <span className="rounded-full bg-black/5 px-2 py-0.5 text-[11px] font-semibold text-[#777a76]">
+                                    {filtered.length - feedVisibleCount}건 남음 ∨
+                                  </span>
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => setFeedVisibleCount(5)}
+                                  className="inline-flex items-center gap-1.5 rounded-xl border border-black/10 bg-white px-5 py-2 text-xs font-semibold text-[#555] transition hover:bg-[#f7f7f4]"
+                                >
+                                  <span>접기 (최근 5건만 보기 ∧)</span>
+                                </button>
+                              )}
+                            </div>
+                          )}
                         </div>
                       );
                     })()}
