@@ -2,8 +2,10 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Header from "@/components/Header";
 import { getSupabaseClient } from "@/lib/supabase/client";
+import { isPureChosung, matchHangulSearch } from "@/lib/utils/hangul";
 
 type RecentUpdate = {
   id: string;
@@ -20,6 +22,7 @@ type SearchResult = {
   name: string;
   address: string;
   district: string | null;
+  project_type: string | null;
   current_status: string | null;
 };
 
@@ -36,6 +39,7 @@ function formatDate(date: string) {
 }
 
 export default function Home() {
+  const router = useRouter();
   const [recentUpdates, setRecentUpdates] = useState<RecentUpdate[]>([]);
   const [summaryStats, setSummaryStats] = useState(emptyStats);
   const [dashboardLoading, setDashboardLoading] = useState(true);
@@ -44,6 +48,8 @@ export default function Home() {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState("");
+  const [selectedIndex, setSelectedIndex] = useState(-1);
+  const [isInputFocused, setIsInputFocused] = useState(false);
 
   useEffect(() => {
     async function loadDashboard() {
@@ -100,42 +106,89 @@ export default function Home() {
     loadDashboard();
   }, []);
 
-  async function searchProjects(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  // Debounced search logic with Chosung and multi-token matching
+  useEffect(() => {
     const term = query.trim();
-    if (!term) {
-      setResults([]);
-      setSearchError("");
-      return;
-    }
+    if (!term) return;
 
-    setSearching(true);
-    setSearchError("");
-    try {
-      const supabase = getSupabaseClient();
-      const [byName, byAddress] = await Promise.all([
-        supabase
-          .from("projects")
-          .select("id,name,address,district,current_status")
-          .ilike("name", `%${term}%`)
-          .limit(10),
-        supabase
-          .from("projects")
-          .select("id,name,address,district,current_status")
-          .ilike("address", `%${term}%`)
-          .limit(10),
-      ]);
-      if (byName.error) throw byName.error;
-      if (byAddress.error) throw byAddress.error;
-      const merged = [...(byName.data ?? []), ...(byAddress.data ?? [])];
-      setResults(
-        merged.filter((project, index, all) => all.findIndex((item) => item.id === project.id) === index)
-      );
-    } catch {
-      setSearchError("검색 중 문제가 발생했습니다. Supabase 연결 설정을 확인해 주세요.");
+    const timer = setTimeout(async () => {
+      setSearching(true);
+      setSearchError("");
+      setSelectedIndex(-1);
+
+      try {
+        const supabase = getSupabaseClient();
+
+        if (isPureChosung(term)) {
+          // 초성 검색인 경우 상위 사업장 목록을 가져와 클라이언트 초성 매칭 실행
+          const { data, error } = await supabase
+            .from("projects")
+            .select("id,name,address,district,project_type,current_status")
+            .limit(400);
+
+          if (error) throw error;
+
+          const matched = (data ?? [])
+            .filter((p) => matchHangulSearch(p.name, term) || matchHangulSearch(p.address, term))
+            .slice(0, 12);
+
+          setResults(matched);
+        } else {
+          const tokens = term.split(/\s+/).filter(Boolean);
+          if (tokens.length > 1) {
+            // 다중 키워드 (예: "용산구 한남", "대치 은마")
+            const [t1, t2] = tokens;
+            const { data, error } = await supabase
+              .from("projects")
+              .select("id,name,address,district,project_type,current_status")
+              .or(`name.ilike.%${t1}%,address.ilike.%${t1}%,district.ilike.%${t1}%`)
+              .or(`name.ilike.%${t2}%,address.ilike.%${t2}%,district.ilike.%${t2}%`)
+              .limit(15);
+
+            if (error) throw error;
+            setResults(data ?? []);
+          } else {
+            // 단일 키워드 검색
+            const { data, error } = await supabase
+              .from("projects")
+              .select("id,name,address,district,project_type,current_status")
+              .or(`name.ilike.%${term}%,address.ilike.%${term}%,district.ilike.%${term}%`)
+              .limit(15);
+
+            if (error) throw error;
+            setResults(data ?? []);
+          }
+        }
+      } catch {
+        setSearchError("검색 중 문제가 발생했습니다. Supabase 연결 설정을 확인해 주세요.");
+        setResults([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setSelectedIndex((prev) => (results.length > 0 ? (prev + 1) % results.length : -1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setSelectedIndex((prev) => (results.length > 0 ? (prev - 1 + results.length) % results.length : -1));
+    } else if (e.key === "Escape") {
       setResults([]);
-    } finally {
-      setSearching(false);
+      setIsInputFocused(false);
+    }
+  }
+
+  function handleSearchSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (selectedIndex >= 0 && results[selectedIndex]) {
+      router.push(`/projects/${results[selectedIndex].id}`);
+    } else if (results.length === 1) {
+      router.push(`/projects/${results[0].id}`);
     }
   }
 
@@ -150,64 +203,108 @@ export default function Home() {
             서울 정비사업의<br />변화를 가장 먼저.
           </h1>
 
-          <form className="mt-10 max-w-2xl" onSubmit={searchProjects}>
-            <label
-              className="flex h-16 items-center gap-4 rounded-2xl border border-black/10 bg-white px-5 shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition focus-within:border-black/30"
-              htmlFor="project-search"
-            >
-              <svg
-                aria-hidden="true"
-                className="h-5 w-5 shrink-0 text-[#777a76]"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                viewBox="0 0 24 24"
+          <div className="relative mt-10 max-w-2xl">
+            <form onSubmit={handleSearchSubmit}>
+              <label
+                className="flex h-16 items-center gap-4 rounded-2xl border border-black/10 bg-white px-5 shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition focus-within:border-black/30"
+                htmlFor="project-search"
               >
-                <circle cx="11" cy="11" r="6" />
-                <path d="m16 16 4 4" />
-              </svg>
-              <input
-                id="project-search"
-                className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-[#989b96]"
-                placeholder="사업장명, 도로명/지번 주소 또는 자치구 검색"
-                type="search"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-              />
-              <kbd className="hidden rounded border border-black/10 px-2 py-1 text-xs text-[#777a76] sm:block">
-                Enter
-              </kbd>
-            </label>
-            {searching && <p className="mt-3 text-sm text-[#777a76]">사업장을 검색 중입니다...</p>}
-            {searchError && <p className="mt-3 text-sm text-rose-600">{searchError}</p>}
-            {!searching && query.trim() && !searchError && results.length === 0 && (
-              <p className="mt-3 text-sm text-[#777a76]">검색 결과가 없습니다.</p>
+                <svg
+                  aria-hidden="true"
+                  className="h-5 w-5 shrink-0 text-[#777a76]"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  viewBox="0 0 24 24"
+                >
+                  <circle cx="11" cy="11" r="6" />
+                  <path d="m16 16 4 4" />
+                </svg>
+                <input
+                  id="project-search"
+                  className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-[#989b96]"
+                  placeholder="사업장명, 초성(예: ㅎㄴ, ㄷㅊ), 주소, 자치구 검색"
+                  type="search"
+                  value={query}
+                  autoComplete="off"
+                  onFocus={() => setIsInputFocused(true)}
+                  onChange={(event) => {
+                    const val = event.target.value;
+                    setQuery(val);
+                    if (!val.trim()) {
+                      setResults([]);
+                      setSearchError("");
+                      setSearching(false);
+                      setSelectedIndex(-1);
+                    }
+                  }}
+                  onKeyDown={handleKeyDown}
+                />
+                {query && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setQuery("");
+                      setResults([]);
+                    }}
+                    className="text-[#989b96] hover:text-[#171918]"
+                    title="검색어 지우기"
+                  >
+                    ✕
+                  </button>
+                )}
+                <kbd className="hidden rounded border border-black/10 px-2 py-1 text-xs text-[#777a76] sm:block">
+                  Enter
+                </kbd>
+              </label>
+            </form>
+
+            {searching && (
+              <p className="mt-2 text-xs text-[#777a76] animate-pulse">실시간 검색 중...</p>
             )}
-            {results.length > 0 && (
-              <div className="mt-3 overflow-hidden rounded-2xl border border-black/8 bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-                {results.map((project) => (
+            {searchError && <p className="mt-2 text-xs text-rose-600">{searchError}</p>}
+            {!searching && query.trim() && !searchError && results.length === 0 && (
+              <p className="mt-2 text-xs text-[#777a76]">일치하는 사업장 결과가 없습니다.</p>
+            )}
+
+            {/* Live Autocomplete Results */}
+            {results.length > 0 && isInputFocused && (
+              <div className="absolute left-0 right-0 top-full z-20 mt-2 max-h-96 overflow-y-auto rounded-2xl border border-black/8 bg-white shadow-[0_12px_40px_rgb(0,0,0,0.08)]">
+                {results.map((project, idx) => (
                   <Link
-                    className="block border-b border-black/7 px-5 py-3.5 transition hover:bg-[#f7f7f4] last:border-0"
+                    className={`block border-b border-black/5 px-5 py-3.5 transition last:border-0 ${
+                      idx === selectedIndex ? "bg-[#f2f2ee]" : "hover:bg-[#f7f7f4]"
+                    }`}
                     href={`/projects/${project.id}`}
                     key={project.id}
+                    onClick={() => setIsInputFocused(false)}
                   >
-                    <div className="flex items-center gap-2">
-                      {project.district && (
-                        <span className="rounded bg-black/5 px-1.5 py-0.5 text-xs font-semibold text-[#171918]">
-                          {project.district}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        {project.district && (
+                          <span className="shrink-0 rounded bg-black/5 px-1.5 py-0.5 text-xs font-semibold text-[#171918]">
+                            {project.district}
+                          </span>
+                        )}
+                        <p className="truncate font-semibold text-[#171918]">{project.name}</p>
+                      </div>
+                      {project.current_status && (
+                        <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                          {project.current_status}
                         </span>
                       )}
-                      <p className="font-semibold">{project.name}</p>
                     </div>
-                    <p className="mt-1 text-sm text-[#777a76]">
-                      {project.address}
-                      {project.current_status ? ` · ${project.current_status}` : ""}
-                    </p>
+                    <div className="mt-1 flex items-center justify-between text-xs text-[#777a76]">
+                      <p className="truncate">{project.address}</p>
+                      {project.project_type && (
+                        <span className="shrink-0 text-[#989b96] ml-2">{project.project_type}</span>
+                      )}
+                    </div>
                   </Link>
                 ))}
               </div>
             )}
-          </form>
+          </div>
 
           {/* Popular Districts Quick Links */}
           <div className="mt-6 flex flex-wrap items-center gap-2 text-xs text-[#777a76]">
