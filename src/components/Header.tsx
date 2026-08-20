@@ -23,6 +23,22 @@ export default function Header() {
         <nav className="hidden sm:flex items-center gap-5 text-sm font-medium">
           <Link
             className={`transition ${
+              pathname === "/map" ? "font-semibold text-[#e6523a]" : "text-[#444] hover:text-[#171918]"
+            }`}
+            href="/map"
+          >
+            🗺️ 정비지도
+          </Link>
+          <Link
+            className={`transition ${
+              pathname === "/compare" ? "font-semibold text-[#e6523a]" : "text-[#444] hover:text-[#171918]"
+            }`}
+            href="/compare"
+          >
+            ⚔️ 1:1 비교
+          </Link>
+          <Link
+            className={`transition ${
               pathname === "/changes" ? "font-semibold text-[#e6523a]" : "text-[#444] hover:text-[#171918]"
             }`}
             href="/changes"

@@ -54,6 +54,13 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
               <span className="text-sm">🗺️</span>
               <span>네이버 지도로 위치 보기 ↗</span>
             </a>
+            <Link
+              href={`/compare?p1=${project.id}`}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-black/10 bg-white px-3 py-1 text-xs font-bold text-[#171918] transition hover:bg-[#f7f7f4] shadow-2xs"
+            >
+              <span>⚔️</span>
+              <span>다른 구역과 1:1 비교하기 ➔</span>
+            </Link>
           </div>
 
           <div className="mt-8 grid gap-3 sm:grid-cols-4">
