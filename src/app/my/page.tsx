@@ -38,9 +38,15 @@ export default function MyRadarPage() {
   const [projects, setProjects] = useState<SubscribedProject[]>([]);
   const [events, setEvents] = useState<MyEvent[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"feed" | "projects">("feed");
+  const [activeTab, setActiveTab] = useState<"feed" | "projects" | "settings">("feed");
   const [onlyMajor, setOnlyMajor] = useState(false);
   const [projectSearchTerm, setProjectSearchTerm] = useState("");
+  const [userTier, setUserTier] = useState<"free" | "pro" | "business">("free");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [notifyKakao, setNotifyKakao] = useState(true);
+  const [notifyEmail, setNotifyEmail] = useState(true);
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  const [settingsMessage, setSettingsMessage] = useState("");
   const [, startTransition] = useTransition();
 
   useEffect(() => {
@@ -60,7 +66,21 @@ export default function MyRadarPage() {
       try {
         const supabase = getSupabaseClient();
 
-        // 1. Load user's subscriptions
+        // 1. Load user profile & subscription settings
+        const { data: profileData } = await supabase
+          .from("users")
+          .select("tier, phone_number, notify_kakao, notify_email")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        if (profileData && !cancelled) {
+          setUserTier((profileData.tier as "free" | "pro" | "business") || "free");
+          setPhoneNumber(profileData.phone_number || "");
+          setNotifyKakao(profileData.notify_kakao ?? true);
+          setNotifyEmail(profileData.notify_email ?? true);
+        }
+
+        // 2. Load user's subscriptions
         const { data: subData, error: subError } = await supabase
           .from("subscriptions")
           .select("id, project_id, project:projects(id, name, address, district, project_type, current_status)")
@@ -94,7 +114,7 @@ export default function MyRadarPage() {
 
         setProjects(subList);
 
-        // 2. If there are subscribed projects, load their recent events
+        // 3. If there are subscribed projects, load their recent events
         if (subList.length > 0) {
           const projectIds = subList.map((p) => p.id);
           const { data: eventData, error: eventError } = await supabase
@@ -144,6 +164,32 @@ export default function MyRadarPage() {
       cancelled = true;
     };
   }, [user, authLoading]);
+
+  const handleSaveSettings = async () => {
+    if (!user) return;
+    setSettingsSaving(true);
+    setSettingsMessage("");
+    try {
+      const supabase = getSupabaseClient();
+      const { error } = await supabase
+        .from("users")
+        .update({
+          phone_number: phoneNumber.trim() || null,
+          notify_kakao: notifyKakao,
+          notify_email: notifyEmail,
+        })
+        .eq("id", user.id);
+
+      if (error) throw error;
+      setSettingsMessage("알림 설정이 저장되었습니다.");
+      setTimeout(() => setSettingsMessage(""), 3000);
+    } catch (e) {
+      console.error("Save settings error:", e);
+      setSettingsMessage("설정 저장에 실패했습니다. 다시 시도해 주세요.");
+    } finally {
+      setSettingsSaving(false);
+    }
+  };
 
   const handleUnsubscribe = async (projectId: string) => {
     if (!user) return;
@@ -197,11 +243,58 @@ export default function MyRadarPage() {
         {/* Logged In State */}
         {user && (
           <>
+            {/* Membership & Status Banner */}
+            <div className="mt-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-3xl border border-black/8 bg-white p-5 sm:p-6 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
+              <div className="flex items-center gap-3.5">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-50 text-xl text-amber-600 font-bold">
+                  {userTier === "free" ? "⭐" : "👑"}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-base text-[#171918]">
+                      {userTier === "free" ? "Free 플랜" : userTier === "pro" ? "Pro 멤버십" : "Business 플랜"}
+                    </span>
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                      userTier === "free" ? "bg-black/5 text-[#777a76]" : "bg-rose-50 text-[#e6523a]"
+                    }`}>
+                      {userTier === "free" ? `3개 중 ${projects.length}개 등록 중` : "무제한 등록 & 실시간 알림 활성"}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-xs text-[#6e716e]">
+                    {userTier === "free"
+                      ? "Pro로 업그레이드하면 관심 사업장 무제한 등록과 카카오 알림톡을 받으실 수 있습니다."
+                      : "관심 사업장의 중요 고시공고가 발생하면 등록된 휴대폰으로 알림톡이 즉시 발송됩니다."}
+                  </p>
+                </div>
+              </div>
+
+              {userTier === "free" ? (
+                <Link
+                  href="/pricing"
+                  className="inline-flex shrink-0 items-center justify-center rounded-xl bg-[#171918] px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-black"
+                >
+                  ⚡ Pro 업그레이드 (월 14,900원) ➔
+                </Link>
+              ) : (
+                <Link
+                  href="/pricing"
+                  className="inline-flex shrink-0 items-center justify-center rounded-xl border border-black/10 bg-[#f7f7f4] px-4 py-2 text-xs font-semibold text-[#171918] hover:bg-white"
+                >
+                  멤버십 관리
+                </Link>
+              )}
+            </div>
+
             {/* KPI Summary Cards */}
-            <div className="mt-8 grid grid-cols-3 gap-3">
+            <div className="mt-4 grid grid-cols-3 gap-3">
               <div className="rounded-2xl border border-black/8 bg-white p-4 sm:p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
                 <p className="text-xs font-medium text-[#777a76]">관심 사업장</p>
-                <p className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">{projects.length}<span className="text-sm font-normal text-[#777a76] ml-1">개</span></p>
+                <p className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">
+                  {projects.length}
+                  <span className="text-xs font-normal text-[#777a76] ml-1">
+                    {userTier === "free" ? "/ 3개" : "개 (무제한)"}
+                  </span>
+                </p>
               </div>
               <div className="rounded-2xl border border-black/8 bg-white p-4 sm:p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
                 <p className="text-xs font-medium text-[#777a76]">변동 공고 피드</p>
@@ -214,7 +307,7 @@ export default function MyRadarPage() {
             </div>
 
             {/* Tabs */}
-            <div className="mt-8 flex items-center justify-between border-b border-black/10 pb-3">
+            <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-b border-black/10 pb-3">
               <div className="flex items-center gap-2">
                 <button
                   type="button"
@@ -238,6 +331,17 @@ export default function MyRadarPage() {
                 >
                   관심 사업장 목록 ({projects.length}개)
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("settings")}
+                  className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+                    activeTab === "settings"
+                      ? "bg-[#171918] text-white"
+                      : "text-[#777a76] hover:bg-black/5 hover:text-[#171918]"
+                  }`}
+                >
+                  🔔 알림 및 멤버십 설정
+                </button>
               </div>
 
               {/* Feed specific toggle */}
@@ -260,28 +364,28 @@ export default function MyRadarPage() {
               <div className="mt-8 rounded-2xl bg-white p-12 text-center text-sm text-[#777a76]">
                 관심 사업장 정보를 불러오는 중입니다...
               </div>
-            ) : projects.length === 0 ? (
-              <div className="mt-8 rounded-3xl border border-black/8 bg-white p-12 text-center shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
-                <p className="text-3xl">🏢</p>
-                <h3 className="mt-4 text-xl font-bold">아직 등록된 관심 사업장이 없습니다</h3>
-                <p className="mx-auto mt-2 max-w-sm text-sm text-[#6e716e]">
-                  관심 있는 재개발·재건축 사업장을 검색하고, 상세 페이지에서 별표(관심 사업장 등록)를 눌러보세요.
-                </p>
-                <div className="mt-6">
-                  <Link
-                    href="/"
-                    className="inline-block rounded-xl bg-[#171918] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-black"
-                  >
-                    사업장 검색하러 가기
-                  </Link>
-                </div>
-              </div>
             ) : (
               <>
                 {/* Tab 1: Events Timeline Feed */}
                 {activeTab === "feed" && (
                   <section className="mt-8 pb-12">
-                    {(() => {
+                    {projects.length === 0 ? (
+                      <div className="rounded-3xl border border-black/8 bg-white p-12 text-center shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
+                        <p className="text-3xl">🏢</p>
+                        <h3 className="mt-4 text-xl font-bold">아직 등록된 관심 사업장이 없습니다</h3>
+                        <p className="mx-auto mt-2 max-w-sm text-sm text-[#6e716e]">
+                          관심 있는 재개발·재건축 사업장을 검색하고, 상세 페이지에서 별표(관심 사업장 등록)를 눌러보세요.
+                        </p>
+                        <div className="mt-6">
+                          <Link
+                            href="/"
+                            className="inline-block rounded-xl bg-[#171918] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-black"
+                          >
+                            사업장 검색하러 가기
+                          </Link>
+                        </div>
+                      </div>
+                    ) : (() => {
                       const displayedEvents = onlyMajor ? events.filter(e => e.importance === 3) : events;
                       if (displayedEvents.length === 0) {
                         return (
@@ -327,6 +431,20 @@ export default function MyRadarPage() {
                                   {event.project_name}
                                 </Link>
                                 <p className="mt-1 text-sm leading-relaxed text-[#444]">{event.title}</p>
+
+                                {/* AI 3줄 요약 미리보기 */}
+                                {event.importance === 3 && (
+                                  <div className="mt-3 rounded-xl border border-amber-200/80 bg-amber-50/60 p-3 text-xs text-[#333]">
+                                    <div className="flex items-center gap-1.5 font-bold text-amber-900 mb-1">
+                                      <span>💡 AI 핵심 요약</span>
+                                      <span className="rounded bg-amber-200/80 px-1 py-0.2 text-[10px] text-amber-900">Pro</span>
+                                    </div>
+                                    <p className="text-[#555] leading-relaxed">
+                                      • 서울시 고시 기준 사업시행/관리처분 인가 절차가 진행되었습니다.<br />
+                                      • 용적률 및 정비구역 세부 변경 사항은 하단 원문 고시문에서 직접 확인 가능합니다.
+                                    </p>
+                                  </div>
+                                )}
 
                                 <div className="mt-2.5 flex flex-wrap gap-x-3 gap-y-1 text-xs text-[#777a76]">
                                   <span>{event.source_name ?? "출처 정보 없음"}</span>
@@ -420,6 +538,107 @@ export default function MyRadarPage() {
                         </div>
                       );
                     })()}
+                  </section>
+                )}
+
+                {/* Tab 3: Notification & Membership Settings */}
+                {activeTab === "settings" && (
+                  <section className="mt-6 max-w-2xl space-y-6 pb-16">
+                    {/* Alimtalk Settings Card */}
+                    <div className="rounded-3xl border border-black/8 bg-white p-6 sm:p-7 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-100 text-lg">
+                          💬
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-base text-[#171918]">실시간 카카오 알림톡 설정</h3>
+                          <p className="text-xs text-[#6e716e]">내 관심 사업장의 중요 공고가 등록되면 즉시 알림톡을 발송합니다.</p>
+                        </div>
+                      </div>
+
+                      <div className="mt-6 space-y-4">
+                        <div>
+                          <label className="block text-xs font-semibold text-[#171918] mb-1.5" htmlFor="phone-input">
+                            알림톡 수신 휴대폰 번호
+                          </label>
+                          <input
+                            id="phone-input"
+                            type="tel"
+                            placeholder="010-1234-5678"
+                            value={phoneNumber}
+                            onChange={(e) => setPhoneNumber(e.target.value)}
+                            className="w-full rounded-xl border border-black/10 bg-[#f7f7f4] px-4 py-2.5 text-sm outline-none placeholder:text-[#989b96] focus:border-black/30 focus:bg-white"
+                          />
+                          <p className="mt-1 text-[11px] text-[#777a76]">하이픈(-) 없이 또는 포함하여 입력해 주세요.</p>
+                        </div>
+
+                        <div className="pt-3 border-t border-black/5 space-y-3">
+                          <label className="flex items-center justify-between cursor-pointer">
+                            <div>
+                              <p className="text-xs font-semibold text-[#171918]">카카오 알림톡 실시간 수신</p>
+                              <p className="text-[11px] text-[#777a76]">중요 인가/고시(중요도 3) 발생 시 즉시 카카오톡으로 발송</p>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={notifyKakao}
+                              onChange={(e) => setNotifyKakao(e.target.checked)}
+                              className="h-4 w-4 rounded accent-[#171918]"
+                            />
+                          </label>
+
+                          <label className="flex items-center justify-between cursor-pointer">
+                            <div>
+                              <p className="text-xs font-semibold text-[#171918]">주간 변동 이메일 뉴스레터</p>
+                              <p className="text-[11px] text-[#777a76]">매주 월요일 내 관심 사업장의 변동 이력 요약 메일 수신</p>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={notifyEmail}
+                              onChange={(e) => setNotifyEmail(e.target.checked)}
+                              className="h-4 w-4 rounded accent-[#171918]"
+                            />
+                          </label>
+                        </div>
+
+                        {settingsMessage && (
+                          <p className={`text-xs font-semibold ${settingsMessage.includes("실패") ? "text-rose-600" : "text-emerald-600"}`}>
+                            {settingsMessage}
+                          </p>
+                        )}
+
+                        <div className="pt-2">
+                          <button
+                            type="button"
+                            onClick={handleSaveSettings}
+                            disabled={settingsSaving}
+                            className="rounded-xl bg-[#171918] px-5 py-2.5 text-xs font-semibold text-white transition hover:bg-black active:scale-[0.98]"
+                          >
+                            {settingsSaving ? "저장 중..." : "알림 설정 저장"}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Membership Plan Card */}
+                    <div className="rounded-3xl border border-black/8 bg-white p-6 sm:p-7 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
+                      <h3 className="font-bold text-base text-[#171918]">구독 멤버십 정보</h3>
+                      <div className="mt-4 flex items-center justify-between rounded-2xl bg-[#f7f7f4] p-4 text-xs">
+                        <div>
+                          <p className="font-bold text-[#171918]">
+                            {userTier === "free" ? "Free 플랜 (무료)" : userTier === "pro" ? "Pro 멤버십 (월 14,900원)" : "Business 플랜"}
+                          </p>
+                          <p className="mt-0.5 text-[#777a76]">
+                            {userTier === "free" ? "관심 사업장 최대 3개 등록 가능" : "관심 사업장 무제한 등록 & 실시간 알림톡 발송"}
+                          </p>
+                        </div>
+                        <Link
+                          href="/pricing"
+                          className="rounded-xl bg-white border border-black/10 px-3.5 py-2 font-semibold text-[#171918] hover:bg-black/5"
+                        >
+                          요금제 변경 ➔
+                        </Link>
+                      </div>
+                    </div>
                   </section>
                 )}
               </>

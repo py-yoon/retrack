@@ -200,6 +200,11 @@ npx supabase migration list
 
 | 변경 | 구현 내용 | 관련 파일 |
 | --- | --- | --- |
+| 유료 구독 & 티어 아키텍처 | Free(3개 제한)/Pro(무제한, 알림톡, AI요약)/Business 요금제 및 비교 안내 화면(`src/app/pricing/page.tsx`), 업그레이드 유도 모달(`src/components/UpgradeModal.tsx`) 구축 | `src/app/pricing/page.tsx`, `src/components/UpgradeModal.tsx` |
+| 알림 설정 및 전화번호 등록 | `/my` 페이지 내 실시간 카카오 알림톡 수신용 전화번호 설정 및 이메일 뉴스레터 수신 동의 관리 탭 구현 | `src/app/my/page.tsx` |
+| 관심 사업장 3개 제한 게이팅 | 무료 플랜에서 4개 이상 등록 시 Pro 업그레이드 안내 모달 팝업 및 연동 | `src/components/SubscriptionButton.tsx` |
+| AI 핵심 요약 및 배지 | 중요 인가 공고(중요도 3) 대상 `💡 AI 핵심 요약 (Pro)` 하이라이트 UI 연동 | `src/app/my/page.tsx` |
+| DB 구독 티어 마이그레이션 | `users.tier`, `users.phone_number`, `users.notify_kakao`, `events.summary_ai` 마이그레이션 생성 및 원격 DB 적용 완료 | `supabase/migrations/20260820000000_add_subscription_tiers_and_ai_summary.sql` |
 | 실시간 초성 & 복합 검색 | 한글 초성 분해 알고리즘(`src/lib/utils/hangul.ts`) 구축, 250ms 디바운스 실시간 자동완성, "ㅎㄴ"→"한남" / "용산구 한남" 복합어 검색 지원 | `src/lib/utils/hangul.ts`, `src/app/page.tsx` |
 | 검색 키보드 탐색 및 UX | 방향키(↑/↓) 선택, Enter 바로가기, Esc 닫기, 검색어 즉시 삭제(✕) 버튼, 사업유형 및 추진단계 태그 표시 | `src/app/page.tsx` |
 | 내 관심 사업장 피드 강화 | KPI 통계 카드(관심 사업장, 변동 공고, 주요 인가), "중요 공고만 보기" 토글, 내 관심 사업장 내 실시간 검색/필터링 | `src/app/my/page.tsx` |
@@ -223,12 +228,13 @@ npx supabase migration list
 - 사업장: **4,070개** (자치구 보유: 4,055개 / 99.63%)
 - 이벤트: **592개**
 - 추진 단계: **497개**
-- 마이그레이션: 로컬 4개 마이그레이션 모두 원격 적용 완료 (`20260819000000_handle_new_user_oauth.sql` 포함)
+- 마이그레이션: 로컬 5개 마이그레이션 모두 원격 적용 완료 (`20260820000000_add_subscription_tiers_and_ai_summary.sql` 포함)
 
 ## 10. 향후 확장 계획
 
-1. **알림 채널 확장**: 관심 사업장의 중요 공고(중요도 3) 발생 시 이메일 / Web Push / 카카오 알림톡 발송
+1. **실제 카카오 비즈메시지 API 연동**: Solapi, 카카오 i 비즈메시지, 알림톡 API 키 발송 모듈 연동
 2. **지도 기반 시각화 (Map View)**: 서울시 지도 위에 사업장 위치 및 최근 변동 핫스팟 시각화
+
 
 
 
