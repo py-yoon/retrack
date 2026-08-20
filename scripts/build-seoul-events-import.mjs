@@ -32,20 +32,32 @@ for (const row of projectRows) {
 const clean = (value) => String(value ?? "").replaceAll(/<[^>]*>/g, " ").replaceAll(/\s+/g, " ").trim();
 const normalize = (value) => clean(value).replaceAll(/[^가-힣a-zA-Z0-9]/g, "").toLowerCase();
 
+const STOP_WORDS = new Set([
+  "서울특별시", "서울시", "서울", "도시환경정비", "도시환경정비구역", "도시환경정비지구", "도시정비형",
+  "주택재개발", "주택재건축", "주택재개발정비사업", "주택재건축정비사업", "재정비촉진", "재정비촉진지구", "재정비촉진구역",
+  "재개발사업", "재건축사업", "정비사업", "재개발", "재건축", "도시계획", "정비구역", "지구단위계획",
+  "공동주택", "아파트", "구역", "지구"
+]);
+
 const projectSearch = [...projects.entries()].map(([code, pRows]) => {
   const combinedText = pRows.map((r) => `${r.PSTN_NM ?? ""} ${r.RGN_NM ?? ""}`).join(" ");
   const allCodes = pRows.flatMap((r) => [r.PRJC_CD, r.RPT_MNG_CD, r.DCSN_ANCMNT_MNG_CD]).filter(Boolean);
   const district = resolveDistrict({ text: combinedText, codes: allCodes });
   const names = pRows.map((r) => r.RGN_NM).filter(Boolean);
   const addrs = pRows.map((r) => r.PSTN_NM).filter(Boolean);
-  const searchKeywords = [...new Set([...names, ...addrs])].map(normalize).filter((k) => k.length >= 4);
+
+  // Extract clean project names without generic stop words
+  const searchKeywords = [...new Set([...names, ...addrs])]
+    .map(normalize)
+    .filter((k) => k.length >= 3 && !STOP_WORDS.has(k) && !k.startsWith("서울특별시"));
+
   return { code, district, searchKeywords };
 });
 
 const sqlValue = (value) => value == null || value === "" ? "null" : `'${String(value).replaceAll("'", "''")}'`;
 
 function determineImportance(title) {
-  if (/관리처분|사업시행계획인가|조합설립인가|정비구역\s*지정|준공인가|착공|시공사\s*선정|분양가|이주/.test(title)) {
+  if (/관리처분|사업시행계획인가|사업시행인가|조합설립인가|정비구역\s*지정|준공인가|착공|시공사\s*선정|분양가|이주/.test(title)) {
     return 3; // 중요
   }
   if (/공람|설명회|의견청취|열람|환경영향평가|정비계획\s*변경|공청회/.test(title)) {
@@ -73,14 +85,23 @@ for (const notice of noticeRows) {
 
   let bestProject = null;
   for (const candidate of projectSearch) {
-    const isKeywordMatch = candidate.searchKeywords.some((keyword) => normalizedNotice.includes(keyword));
-    if (!isKeywordMatch) continue;
+    if (candidate.searchKeywords.length === 0) continue;
 
-    // District validation: If both notice and candidate project have district resolved, enforce matching
+    // Strict district validation
     if (noticeDistrict && candidate.district && noticeDistrict !== candidate.district) {
       crossDistrictMismatchCount++;
       continue;
     }
+    if (noticeDistrict && !candidate.district) {
+      continue;
+    }
+
+    const isKeywordMatch = candidate.searchKeywords.some((keyword) => {
+      if (keyword.length < 3) return false;
+      return normalizedNotice.includes(keyword);
+    });
+
+    if (!isKeywordMatch) continue;
 
     bestProject = candidate;
     break;

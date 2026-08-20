@@ -96,6 +96,22 @@ export function calculateStagePipeline(
     }
   }
 
+  // Check if any event in eventsData indicates a higher stage
+  if (eventsData && eventsData.length > 0) {
+    for (const e of eventsData) {
+      const eTitle = e.title.replace(/\s+/g, "");
+      for (let i = 0; i < STANDARD_STAGES.length; i++) {
+        const stage = STANDARD_STAGES[i];
+        // Match specific keywords for stages (e.g. 사업시행인가, 관리처분인가, 조합설립인가)
+        if (stage.aliases.some((alias) => eTitle.includes(alias))) {
+          if (stage.id > currentStageIndex) {
+            currentStageIndex = stage.id;
+          }
+        }
+      }
+    }
+  }
+
   // Create date lookup map
   const dateMap = new Map<number, string>();
   if (stagesData) {
