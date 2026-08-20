@@ -81,7 +81,7 @@ export default function NaverMapView({
   const infoWindowRef = useRef<NaverInfoWindowInstance | null>(null);
   const [isScriptLoaded, setIsScriptLoaded] = useState(false);
 
-  const clientId = process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID || "";
+  const clientId = process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID || "nbhyehsios";
 
   // Initialize Naver Map once script is loaded
   useEffect(() => {
