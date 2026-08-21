@@ -9,7 +9,7 @@ import { getSupabaseClient } from "@/lib/supabase/client";
 import { isPureChosung, matchHangulSearch } from "@/lib/utils/hangul";
 import BuildingLedgerCard from "@/components/BuildingLedgerCard";
 import { getBuildingLedgerInfo, type BuildingLedgerInfo } from "@/lib/data/building-ledger";
-import { searchProjectsFromCatalog, type ProjectCatalogItem } from "@/lib/data/projects-catalog";
+import { searchProjectsFromCatalog, findProjectFromCatalog, type ProjectCatalogItem } from "@/lib/data/projects-catalog";
 
 type RecentUpdate = {
   id: string;
