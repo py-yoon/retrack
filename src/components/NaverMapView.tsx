@@ -49,6 +49,18 @@ export default function NaverMapView({
 
   const clientId = process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID || "nbhyehsios";
 
+  // 0. Register Naver Auth Failure Callback (must exist before the script loads)
+  useEffect(() => {
+    const w = window as Window & { navermap_authFailure?: () => void };
+    w.navermap_authFailure = () => {
+      console.warn("Naver Maps auth failed (invalid key or unregistered domain), switching to fallback map engine.");
+      setEngineMode("fallback");
+    };
+    return () => {
+      delete w.navermap_authFailure;
+    };
+  }, []);
+
   // 1. Initialize Naver Map
   const initNaver = () => {
     const naver = (window as any).naver;
@@ -78,6 +90,15 @@ export default function NaverMapView({
       setEngineMode("fallback");
     }
   };
+
+  // 1b. Handle client-side route navigation: if the Naver script was already
+  // loaded by a previous page, next/script's onLoad never fires again for this
+  // new instance (it's cached globally), so we must initialize directly here.
+  useEffect(() => {
+    if ((window as unknown as { naver?: { maps?: unknown } }).naver?.maps) {
+      queueMicrotask(initNaver);
+    }
+  }, []);
 
   // 2. Leaflet Fallback Init (Zero-Error Guarantee)
   useEffect(() => {
@@ -252,7 +273,7 @@ export default function NaverMapView({
   return (
     <div className="relative w-full h-full min-h-[520px] rounded-2xl overflow-hidden border border-black/5 bg-[#f5f5f1] shadow-xs">
       <Script
-        src={`https://oapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${clientId}&submodules=geocoder`}
+        src={`https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${clientId}&submodules=geocoder`}
         strategy="afterInteractive"
         onLoad={() => {
           if ((window as any).naver?.maps) {

@@ -57,9 +57,21 @@ export default function ProjectDetailMap({
   const stageColor = getStageColor(currentStatus);
   const naverUrl = getNaverMapUrl(district, address, projectName);
 
+  // 0. Register Naver Auth Failure Callback (must exist before the script loads)
+  useEffect(() => {
+    const w = window as Window & { navermap_authFailure?: () => void };
+    w.navermap_authFailure = () => {
+      console.warn("Naver Maps auth failed (invalid key or unregistered domain), switching to fallback map engine.");
+      setEngineMode("fallback");
+    };
+    return () => {
+      delete w.navermap_authFailure;
+    };
+  }, []);
+
   // 1. Try Naver Map Initialization
   const initNaverMap = () => {
-    if (!mapElement.current) return;
+    if (!mapElement.current || naverMapRef.current) return;
     const naver = (window as any).naver;
     if (!naver?.maps) {
       setEngineMode("fallback");
@@ -152,6 +164,16 @@ export default function ProjectDetailMap({
       setEngineMode("fallback");
     }
   };
+
+  // 1b. Handle client-side route navigation: if the Naver script was already
+  // loaded by a previous page, next/script's onLoad never fires again for this
+  // new instance (it's cached globally), so we must initialize directly here.
+  useEffect(() => {
+    if ((window as unknown as { naver?: { maps?: unknown } }).naver?.maps) {
+      queueMicrotask(initNaverMap);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount only; initNaverMap is idempotent (guarded by naverMapRef)
+  }, []);
 
   // 2. Leaflet Fallback (100% Guaranteed Zero-Error Map)
   useEffect(() => {
@@ -315,7 +337,7 @@ export default function ProjectDetailMap({
     <div className="relative w-full rounded-2xl overflow-hidden border border-black/10 bg-[#f7f7f4] shadow-sm">
       {/* Naver Maps Open API Script with Silent Fallback */}
       <Script
-        src={`https://oapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${clientId}&submodules=geocoder`}
+        src={`https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${clientId}&submodules=geocoder`}
         strategy="afterInteractive"
         onLoad={() => {
           // Check if naver.maps is really available
