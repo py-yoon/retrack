@@ -42,66 +42,70 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
   let events: any[] = [];
   let stages: any[] = [];
 
-  try {
-    const supabase = getSupabaseClient();
-    const dbCall = Promise.all([
-      supabase
-        .from("projects")
-        .select("id,name,address,district,project_type,current_status,updated_at,latitude,longitude")
-        .eq("id", id)
-        .maybeSingle(),
-      supabase
-        .from("events")
-        .select("id,title,event_type,importance,occurred_at,source_name,source_url")
-        .eq("project_id", id)
-        .order("occurred_at", { ascending: false }),
-      supabase
-        .from("project_stages")
-        .select("id,stage_name,stage_order,approved_at")
-        .eq("project_id", id)
-        .order("stage_order"),
-    ]);
+  const decodedId = decodeURIComponent(id);
 
-    const result = await fetchWithTimeout(dbCall, 1500);
-    if (result && result[0]?.data) {
-      const [{ data: pData }, { data: eData }, { data: sData }] = result;
-      project = pData;
-      events = eData ?? [];
-      stages = sData ?? [];
+  // 1. Direct Catalog Match (Instant)
+  const catalogItem = findProjectFromCatalog(decodedId) || findProjectFromCatalog(id);
+  if (catalogItem) {
+    project = {
+      id: catalogItem.id,
+      name: catalogItem.name,
+      address: catalogItem.address,
+      district: catalogItem.district,
+      project_type: catalogItem.project_type,
+      current_status: catalogItem.current_status,
+      updated_at: catalogItem.updated_at,
+      latitude: catalogItem.latitude,
+      longitude: catalogItem.longitude,
+    };
+    events = catalogItem.events;
+  } else {
+    // 2. Supabase DB Lookup
+    try {
+      const supabase = getSupabaseClient();
+      const dbCall = Promise.all([
+        supabase
+          .from("projects")
+          .select("id,name,address,district,project_type,current_status,updated_at,latitude,longitude")
+          .eq("id", id)
+          .maybeSingle(),
+        supabase
+          .from("events")
+          .select("id,title,event_type,importance,occurred_at,source_name,source_url")
+          .eq("project_id", id)
+          .order("occurred_at", { ascending: false }),
+        supabase
+          .from("project_stages")
+          .select("id,stage_name,stage_order,approved_at")
+          .eq("project_id", id)
+          .order("stage_order"),
+      ]);
+
+      const result = await fetchWithTimeout(dbCall, 1500);
+      if (result && result[0]?.data) {
+        const [{ data: pData }, { data: eData }, { data: sData }] = result;
+        project = pData;
+        events = eData ?? [];
+        stages = sData ?? [];
+      }
+    } catch {
+      // Fallback
     }
-  } catch {
-    // Fallback
   }
 
-  // Exact Project Catalog Match
+  // 3. Fallback: Only if completely unknown
   if (!project) {
-    const catalogItem = findProjectFromCatalog(id);
-    if (catalogItem) {
-      project = {
-        id: catalogItem.id,
-        name: catalogItem.name,
-        address: catalogItem.address,
-        district: catalogItem.district,
-        project_type: catalogItem.project_type,
-        current_status: catalogItem.current_status,
-        updated_at: catalogItem.updated_at,
-        latitude: catalogItem.latitude,
-        longitude: catalogItem.longitude,
-      };
-      events = catalogItem.events;
-    } else {
-      project = {
-        id: id,
-        name: "마포로1-24도시환경정비지구",
-        address: "서울특별시 마포구 도화동 16-1 일대",
-        district: "마포구",
-        project_type: "도시정비형 재개발",
-        current_status: "사업시행인가",
-        updated_at: new Date().toISOString(),
-        latitude: 37.5395,
-        longitude: 126.9471,
-      };
-    }
+    project = {
+      id: id,
+      name: decodedId.includes("-") ? decodedId : "서울 정비사업 구역",
+      address: "서울특별시 정비구역",
+      district: "서울시",
+      project_type: "주택재개발",
+      current_status: "사업시행인가",
+      updated_at: new Date().toISOString(),
+      latitude: 37.5395,
+      longitude: 126.9471,
+    };
   }
 
   const pipeline = calculateStagePipeline(
