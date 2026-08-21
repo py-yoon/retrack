@@ -116,6 +116,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       provider: "kakao",
       options: {
         redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(next)}`,
+        // Supabase 기본값(account_email profile_image profile_nickname)은 카카오
+        // 앱의 동의항목에 이메일/프로필사진까지 다 설정해야 해서 번거롭다.
+        // 닉네임만 요청해 최소한으로 줄인다 — 이메일/프로필사진은 못 받는다.
+        scopes: "profile_nickname",
       },
     });
     if (error) {
