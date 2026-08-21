@@ -121,7 +121,9 @@ export default function SeoulInteractiveMap({
       const isSelected = selectedProject?.id === p.id;
 
       // Render Real Polygon ONLY for Verified Projects
-      const polyCoords = getProjectPolygon(p.id, p.lat, p.lng);
+      const polyCoords =
+        getProjectPolygon(p.id, p.lat, p.lng) ||
+        getProjectPolygon(p.name, p.lat, p.lng);
       if (polyCoords && polyCoords.length >= 3) {
         const latlngs: [number, number][] = polyCoords.map((c) => [c.lat, c.lng]);
         const poly = L.polygon(latlngs, {

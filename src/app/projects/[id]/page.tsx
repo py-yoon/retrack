@@ -132,7 +132,9 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
     project.longitude,
     project.address
   );
-  const polygonCoords = getProjectPolygon(project.id, centerCoords.lat, centerCoords.lng);
+  const polygonCoords =
+    getProjectPolygon(project.id, centerCoords.lat, centerCoords.lng) ||
+    getProjectPolygon(project.name, centerCoords.lat, centerCoords.lng);
 
   return (
     <main className="min-h-screen bg-[#f7f7f4] text-[#171918]">
