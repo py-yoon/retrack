@@ -14,7 +14,7 @@ type ProjectDetailMapProps = {
   currentStatus: string | null;
   projectType: string | null;
   center: Coord;
-  polygon: Coord[];
+  polygon: Coord[] | null;
 };
 
 function getStageColor(status: string | null) {

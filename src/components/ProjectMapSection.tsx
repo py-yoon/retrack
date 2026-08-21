@@ -23,7 +23,7 @@ type ProjectMapSectionProps = {
   currentStatus: string | null;
   projectType: string | null;
   center: Coord;
-  polygon: Coord[];
+  polygon: Coord[] | null;
 };
 
 export default function ProjectMapSection(props: ProjectMapSectionProps) {

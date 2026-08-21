@@ -179,8 +179,7 @@ function MapContent() {
     return getProjectSpecs(
       selectedProject.name,
       selectedProject.district,
-      selectedProject.project_type,
-      selectedProject.current_status
+      selectedProject.project_type
     );
   }, [selectedProject]);
 
@@ -303,20 +302,20 @@ function MapContent() {
                   <div className="bg-[#f7f7f4] p-2.5 rounded-xl">
                     <p className="text-[10px] text-[#777a76]">예상 세대수</p>
                     <p className="font-bold text-[#171918] mt-0.5">
-                      {selectedProjectSpecs.expectedUnits.toLocaleString()} 세대
+                      {selectedProjectSpecs.totalUnits ? `${selectedProjectSpecs.totalUnits.toLocaleString()} 세대` : "정보 확인 중"}
                     </p>
                   </div>
                   <div className="bg-[#f7f7f4] p-2.5 rounded-xl">
                     <p className="text-[10px] text-[#777a76]">계획 용적률</p>
-                    <p className="font-bold text-[#171918] mt-0.5">{selectedProjectSpecs.maxFloorRatio}%</p>
+                    <p className="font-bold text-[#171918] mt-0.5">{selectedProjectSpecs.far ?? "-"}</p>
                   </div>
                   <div className="bg-[#f7f7f4] p-2.5 rounded-xl">
                     <p className="text-[10px] text-[#777a76]">시공사</p>
-                    <p className="font-bold text-[#171918] mt-0.5 truncate">{selectedProjectSpecs.constructorName}</p>
+                    <p className="font-bold text-[#171918] mt-0.5 truncate">{selectedProjectSpecs.builder ?? "선정 준비 중"}</p>
                   </div>
                   <div className="bg-[#f7f7f4] p-2.5 rounded-xl">
-                    <p className="text-[10px] text-[#777a76]">예상 일반분양가</p>
-                    <p className="font-bold text-[#171918] mt-0.5">{selectedProjectSpecs.estimatedPricePerPyeong}만/평</p>
+                    <p className="text-[10px] text-[#777a76]">최고 층수</p>
+                    <p className="font-bold text-[#171918] mt-0.5">{selectedProjectSpecs.floors ?? "-"}</p>
                   </div>
                 </div>
               )}

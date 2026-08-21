@@ -120,9 +120,9 @@ export default function SeoulInteractiveMap({
       const color = getMarkerColor(category);
       const isSelected = selectedProject?.id === p.id;
 
-      // Render Polygon for Selected Project or High-Zoom Projects
+      // Render Real Polygon ONLY for Verified Projects
       const polyCoords = getProjectPolygon(p.id, p.lat, p.lng);
-      if (polyCoords.length >= 3) {
+      if (polyCoords && polyCoords.length >= 3) {
         const latlngs: [number, number][] = polyCoords.map((c) => [c.lat, c.lng]);
         const poly = L.polygon(latlngs, {
           color: isSelected ? "#171918" : color.hex,
