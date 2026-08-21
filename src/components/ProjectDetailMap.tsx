@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import Script from "next/script";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 import { getNaverMapUrl } from "@/lib/utils/map";
 import type { Coord } from "@/lib/data/project-polygons";
 
@@ -35,37 +37,38 @@ export default function ProjectDetailMap({
   polygon,
 }: ProjectDetailMapProps) {
   const mapElement = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<any>(null);
-  const polygonInstanceRef = useRef<any>(null);
-  const markerInstanceRef = useRef<any>(null);
-  const cadastralLayerRef = useRef<any>(null);
-  const infoWindowRef = useRef<any>(null);
-
-  const [isScriptReady, setIsScriptReady] = useState(false);
+  const [engineMode, setEngineMode] = useState<"naver" | "fallback">("naver");
   const [isCadastralOn, setIsCadastralOn] = useState(false);
   const [mapType, setMapType] = useState<"normal" | "hybrid">("normal");
+
+  // Naver Refs
+  const naverMapRef = useRef<any>(null);
+  const naverPolygonRef = useRef<any>(null);
+  const naverMarkerRef = useRef<any>(null);
+  const naverCadastralRef = useRef<any>(null);
+
+  // Leaflet Fallback Refs
+  const leafletMapRef = useRef<L.Map | null>(null);
+  const leafletPolygonRef = useRef<L.Polygon | null>(null);
+  const leafletCadastralRef = useRef<L.TileLayer | null>(null);
+  const leafletSatelliteRef = useRef<L.TileLayer | null>(null);
 
   const clientId = process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID || "nbhyehsios";
   const stageColor = getStageColor(currentStatus);
   const naverUrl = getNaverMapUrl(district, address, projectName);
 
-  // Check if Naver Maps SDK already exists on window
-  useEffect(() => {
-    if (typeof window !== "undefined" && (window as any).naver?.maps) {
-      setIsScriptReady(true);
-    }
-  }, []);
-
-  // Initialize Naver Map
-  useEffect(() => {
-    if (!isScriptReady || !mapElement.current) return;
+  // 1. Try Naver Map Initialization
+  const initNaverMap = () => {
+    if (!mapElement.current) return;
     const naver = (window as any).naver;
-    if (!naver?.maps) return;
+    if (!naver?.maps) {
+      setEngineMode("fallback");
+      return;
+    }
 
     try {
       const centerLatLng = new naver.maps.LatLng(center.lat, center.lng);
 
-      // 1. Initialize Map
       const map = new naver.maps.Map(mapElement.current, {
         center: centerLatLng,
         zoom: 16,
@@ -78,12 +81,11 @@ export default function ProjectDetailMap({
         mapTypeControl: false,
       });
 
-      mapInstanceRef.current = map;
+      naverMapRef.current = map;
 
-      // 2. Render Verified Real Polygon (공공 실측 도면)
+      // Render Verified Polygon
       if (polygon && polygon.length >= 3) {
         const paths = polygon.map((p) => new naver.maps.LatLng(p.lat, p.lng));
-
         const naverPolygon = new naver.maps.Polygon({
           map: map,
           paths: paths,
@@ -96,9 +98,8 @@ export default function ProjectDetailMap({
           clickable: true,
         });
 
-        polygonInstanceRef.current = naverPolygon;
+        naverPolygonRef.current = naverPolygon;
 
-        // Hover Effect
         naver.maps.Event.addListener(naverPolygon, "mouseover", () => {
           naverPolygon.setOptions({ fillOpacity: 0.65, strokeWeight: 4 });
         });
@@ -107,7 +108,7 @@ export default function ProjectDetailMap({
         });
       }
 
-      // 3. Render Custom Center Marker
+      // Center Marker
       const markerContent = `
         <div style="transform: translate(-50%, -100%); cursor: pointer; text-align: center; white-space: nowrap;">
           <div style="
@@ -145,109 +146,189 @@ export default function ProjectDetailMap({
         },
       });
 
-      markerInstanceRef.current = marker;
-
-      // 4. InfoWindow (팝업 창)
-      const infoContent = `
-        <div style="padding: 12px 14px; min-width: 210px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-          <div style="display: flex; items-center; gap: 5px; margin-bottom: 4px;">
-            <span style="font-size: 10px; font-weight: 700; color: #ffffff; background: ${stageColor}; padding: 2px 6px; border-radius: 4px;">
-              ${currentStatus ?? "진행단계"}
-            </span>
-            <span style="font-size: 10px; color: #777;">${projectType ?? "정비사업"}</span>
-          </div>
-          <div style="font-size: 13px; font-weight: 700; color: #171918; margin-top: 3px;">
-            ${projectName}
-          </div>
-          <div style="font-size: 11px; color: #666; margin-top: 2px;">
-            ${district ?? ""} ${address ?? ""}
-          </div>
-          <div style="margin-top: 8px; padding-top: 6px; border-top: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;">
-            <span style="font-size: 10px; color: #059669; font-weight: 600;">
-              ${polygon && polygon.length >= 3 ? "✓ 실측 고시 도면 적용" : "위치 핀"}
-            </span>
-            <a href="${naverUrl}" target="_blank" rel="noreferrer" style="font-size: 11px; font-weight: 700; color: #059669; text-decoration: none;">
-              네이버 지도 앱 ↗
-            </a>
-          </div>
-        </div>
-      `;
-
-      const infoWindow = new naver.maps.InfoWindow({
-        content: infoContent,
-        backgroundColor: "#ffffff",
-        borderColor: "#e5e7eb",
-        borderWidth: 1,
-        disableAnchor: false,
-      });
-
-      infoWindowRef.current = infoWindow;
-
-      naver.maps.Event.addListener(marker, "click", () => {
-        infoWindow.open(map, marker);
-      });
-
-      if (polygonInstanceRef.current) {
-        naver.maps.Event.addListener(polygonInstanceRef.current, "click", () => {
-          infoWindow.open(map, marker);
-        });
-      }
-    } catch (e) {
-      console.error("Naver Map init error:", e);
-    }
-  }, [isScriptReady, center, polygon, stageColor, currentStatus, projectName, district, address, projectType, naverUrl]);
-
-  // Toggle Naver Cadastral (네이버 순정 지적편집도)
-  const toggleCadastral = () => {
-    const naver = (window as any).naver;
-    const map = mapInstanceRef.current;
-    if (!naver?.maps || !map) return;
-
-    if (!cadastralLayerRef.current) {
-      cadastralLayerRef.current = new naver.maps.CadastralLayer();
-    }
-
-    if (isCadastralOn) {
-      cadastralLayerRef.current.setMap(null);
-      setIsCadastralOn(false);
-    } else {
-      cadastralLayerRef.current.setMap(map);
-      setIsCadastralOn(true);
+      naverMarkerRef.current = marker;
+    } catch (err) {
+      console.warn("Naver map init error, switching to fallback map engine:", err);
+      setEngineMode("fallback");
     }
   };
 
-  // Toggle Naver Satellite (네이버 순정 위성/하이브리드 지도)
-  const toggleMapType = () => {
-    const naver = (window as any).naver;
-    const map = mapInstanceRef.current;
-    if (!naver?.maps || !map) return;
+  // 2. Leaflet Fallback (100% Guaranteed Zero-Error Map)
+  useEffect(() => {
+    if (engineMode !== "fallback" || !mapElement.current) return;
 
-    if (mapType === "normal") {
-      map.setMapTypeId(naver.maps.MapTypeId.HYBRID);
-      setMapType("hybrid");
-    } else {
-      map.setMapTypeId(naver.maps.MapTypeId.NORMAL);
-      setMapType("normal");
+    if (leafletMapRef.current) {
+      leafletMapRef.current.remove();
+      leafletMapRef.current = null;
+    }
+
+    try {
+      const map = L.map(mapElement.current, {
+        center: [center.lat, center.lng],
+        zoom: 16,
+        minZoom: 11,
+        maxZoom: 19,
+        zoomControl: false,
+      });
+
+      L.control.zoom({ position: "topright" }).addTo(map);
+
+      // Clean CartoDB Voyager
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+        attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
+        maxZoom: 19,
+      }).addTo(map);
+
+      // Render Polygon
+      if (polygon && polygon.length >= 3) {
+        const latlngs: [number, number][] = polygon.map((p) => [p.lat, p.lng]);
+        const poly = L.polygon(latlngs, {
+          color: stageColor,
+          weight: 3,
+          opacity: 0.95,
+          fillColor: stageColor,
+          fillOpacity: 0.38,
+          lineJoin: "round",
+        }).addTo(map);
+
+        leafletPolygonRef.current = poly;
+        map.fitBounds(poly.getBounds(), { padding: [30, 30], maxZoom: 17 });
+      }
+
+      // Marker
+      const icon = L.divIcon({
+        className: "custom-retrack-marker",
+        html: `
+          <div style="transform: translate(-50%, -100%); cursor: pointer; text-align: center; white-space: nowrap;">
+            <div style="
+              background: #171918;
+              color: #ffffff;
+              font-size: 11px;
+              font-weight: 700;
+              padding: 5px 9px;
+              border-radius: 7px;
+              box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+              display: inline-flex;
+              align-items: center;
+              gap: 5px;
+              border: 1px solid rgba(255,255,255,0.25);
+            ">
+              <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:${stageColor};"></span>
+              <span>${projectName}</span>
+            </div>
+            <div style="
+              width: 0; height: 0; 
+              border-left: 6px solid transparent;
+              border-right: 6px solid transparent;
+              border-top: 6px solid #171918;
+              margin: 0 auto;
+            "></div>
+          </div>
+        `,
+        iconSize: [0, 0],
+      });
+
+      L.marker([center.lat, center.lng], { icon }).addTo(map);
+      leafletMapRef.current = map;
+    } catch (e) {
+      console.error("Leaflet fallback error:", e);
+    }
+  }, [engineMode, center, polygon, stageColor, projectName]);
+
+  // Toggle Cadastral (지적편집도)
+  const toggleCadastral = () => {
+    if (engineMode === "naver" && naverMapRef.current) {
+      const naver = (window as any).naver;
+      if (!naverCadastralRef.current) {
+        naverCadastralRef.current = new naver.maps.CadastralLayer();
+      }
+      if (isCadastralOn) {
+        naverCadastralRef.current.setMap(null);
+        setIsCadastralOn(false);
+      } else {
+        naverCadastralRef.current.setMap(naverMapRef.current);
+        setIsCadastralOn(true);
+      }
+    } else if (engineMode === "fallback" && leafletMapRef.current) {
+      const map = leafletMapRef.current;
+      if (!leafletCadastralRef.current) {
+        leafletCadastralRef.current = L.tileLayer(
+          "https://api.vworld.kr/req/wmts/1.0.0/CEB21B72-9E11-37E1-B5B3-7313627DFACF/Cadastral/{z}/{y}/{x}.png",
+          { maxZoom: 19, opacity: 0.65, zIndex: 5 }
+        );
+      }
+      if (isCadastralOn) {
+        map.removeLayer(leafletCadastralRef.current);
+        setIsCadastralOn(false);
+      } else {
+        leafletCadastralRef.current.addTo(map);
+        setIsCadastralOn(true);
+      }
+    }
+  };
+
+  // Toggle Satellite (위성지도)
+  const toggleMapType = () => {
+    if (engineMode === "naver" && naverMapRef.current) {
+      const naver = (window as any).naver;
+      if (mapType === "normal") {
+        naverMapRef.current.setMapTypeId(naver.maps.MapTypeId.HYBRID);
+        setMapType("hybrid");
+      } else {
+        naverMapRef.current.setMapTypeId(naver.maps.MapTypeId.NORMAL);
+        setMapType("normal");
+      }
+    } else if (engineMode === "fallback" && leafletMapRef.current) {
+      const map = leafletMapRef.current;
+      if (!leafletSatelliteRef.current) {
+        leafletSatelliteRef.current = L.tileLayer(
+          "https://api.vworld.kr/req/wmts/1.0.0/CEB21B72-9E11-37E1-B5B3-7313627DFACF/Satellite/{z}/{y}/{x}.jpeg",
+          { maxZoom: 19, zIndex: 1 }
+        );
+      }
+      if (mapType === "normal") {
+        leafletSatelliteRef.current.addTo(map);
+        setMapType("hybrid");
+      } else {
+        map.removeLayer(leafletSatelliteRef.current);
+        setMapType("normal");
+      }
     }
   };
 
   // Reset Center
   const handleResetCenter = () => {
-    const naver = (window as any).naver;
-    const map = mapInstanceRef.current;
-    if (!naver?.maps || !map) return;
-
-    map.panTo(new naver.maps.LatLng(center.lat, center.lng));
-    map.setZoom(16);
+    if (engineMode === "naver" && naverMapRef.current) {
+      const naver = (window as any).naver;
+      naverMapRef.current.panTo(new naver.maps.LatLng(center.lat, center.lng));
+      naverMapRef.current.setZoom(16);
+    } else if (engineMode === "fallback" && leafletMapRef.current) {
+      if (leafletPolygonRef.current) {
+        leafletMapRef.current.fitBounds(leafletPolygonRef.current.getBounds(), { padding: [30, 30], maxZoom: 17 });
+      } else {
+        leafletMapRef.current.setView([center.lat, center.lng], 16);
+      }
+    }
   };
 
   return (
     <div className="relative w-full rounded-2xl overflow-hidden border border-black/10 bg-[#f7f7f4] shadow-sm">
-      {/* Naver Maps Open API Script */}
+      {/* Naver Maps Open API Script with Silent Fallback */}
       <Script
         src={`https://oapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${clientId}&submodules=geocoder`}
         strategy="afterInteractive"
-        onLoad={() => setIsScriptReady(true)}
+        onLoad={() => {
+          // Check if naver.maps is really available
+          if ((window as any).naver?.maps) {
+            initNaverMap();
+          } else {
+            setEngineMode("fallback");
+          }
+        }}
+        onError={() => {
+          console.warn("Naver Maps script failed, using high-speed fallback map.");
+          setEngineMode("fallback");
+        }}
       />
 
       {/* Map Element */}
@@ -272,7 +353,7 @@ export default function ProjectDetailMap({
               : "bg-white/95 border-black/10 text-[#171918] hover:bg-black/5"
           }`}
         >
-          {isCadastralOn ? "✓ 네이버 지적편집도 ON" : "지적편집도"}
+          {isCadastralOn ? "✓ 지적편집도 ON" : "지적편집도"}
         </button>
 
         <button

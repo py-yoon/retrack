@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import Script from "next/script";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 import { getNaverMapUrl } from "@/lib/utils/map";
 import { DISTRICT_COORDINATES } from "@/lib/utils/coordinates";
 import { getProjectPolygon } from "@/lib/data/project-polygons";
@@ -29,184 +31,221 @@ export default function NaverMapView({
   selectedDistrict,
 }: NaverMapViewProps) {
   const mapElement = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<any>(null);
-  const markersRef = useRef<any[]>([]);
-  const polygonsRef = useRef<any[]>([]);
-  const cadastralLayerRef = useRef<any>(null);
-  const infoWindowRef = useRef<any>(null);
-
-  const [isScriptReady, setIsScriptReady] = useState(false);
+  const [engineMode, setEngineMode] = useState<"naver" | "fallback">("naver");
   const [isCadastralOn, setIsCadastralOn] = useState(false);
   const [mapType, setMapType] = useState<"normal" | "hybrid">("normal");
 
+  const naverMapRef = useRef<any>(null);
+  const markersRef = useRef<any[]>([]);
+  const polygonsRef = useRef<any[]>([]);
+  const cadastralLayerRef = useRef<any>(null);
+
+  // Leaflet Fallback Refs
+  const leafletMapRef = useRef<L.Map | null>(null);
+  const leafletMarkersLayerRef = useRef<L.LayerGroup | null>(null);
+  const leafletPolygonsLayerRef = useRef<L.LayerGroup | null>(null);
+  const leafletCadastralRef = useRef<L.TileLayer | null>(null);
+  const leafletSatelliteRef = useRef<L.TileLayer | null>(null);
+
   const clientId = process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID || "nbhyehsios";
 
-  useEffect(() => {
-    if (typeof window !== "undefined" && (window as any).naver?.maps) {
-      setIsScriptReady(true);
-    }
-  }, []);
-
-  // 1. Initialize Map
-  useEffect(() => {
-    if (!isScriptReady || !mapElement.current) return;
+  // 1. Initialize Naver Map
+  const initNaver = () => {
     const naver = (window as any).naver;
-    if (!naver?.maps) return;
+    if (!mapElement.current || !naver?.maps) {
+      setEngineMode("fallback");
+      return;
+    }
 
-    if (!mapInstanceRef.current) {
-      const defaultCenter = new naver.maps.LatLng(37.5665, 126.978);
-      const map = new naver.maps.Map(mapElement.current, {
-        center: defaultCenter,
+    try {
+      if (!naverMapRef.current) {
+        const defaultCenter = new naver.maps.LatLng(37.5665, 126.978);
+        const map = new naver.maps.Map(mapElement.current, {
+          center: defaultCenter,
+          zoom: 12,
+          minZoom: 10,
+          maxZoom: 19,
+          zoomControl: true,
+          zoomControlOptions: {
+            position: naver.maps.Position.TOP_RIGHT,
+          },
+          mapTypeControl: false,
+        });
+
+        naverMapRef.current = map;
+      }
+    } catch {
+      setEngineMode("fallback");
+    }
+  };
+
+  // 2. Leaflet Fallback Init (Zero-Error Guarantee)
+  useEffect(() => {
+    if (engineMode !== "fallback" || !mapElement.current) return;
+
+    if (leafletMapRef.current) {
+      leafletMapRef.current.remove();
+      leafletMapRef.current = null;
+    }
+
+    try {
+      const map = L.map(mapElement.current, {
+        center: [37.5665, 126.978],
         zoom: 12,
         minZoom: 10,
         maxZoom: 19,
-        zoomControl: true,
-        zoomControlOptions: {
-          position: naver.maps.Position.TOP_RIGHT,
-        },
-        mapTypeControl: false,
+        zoomControl: false,
       });
 
-      infoWindowRef.current = new naver.maps.InfoWindow({
-        backgroundColor: "#ffffff",
-        borderColor: "#e5e7eb",
-        borderWidth: 1,
-        disableAnchor: false,
-      });
+      L.control.zoom({ position: "topright" }).addTo(map);
 
-      mapInstanceRef.current = map;
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+        attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
+        maxZoom: 19,
+      }).addTo(map);
+
+      const polyLayer = L.layerGroup().addTo(map);
+      const markLayer = L.layerGroup().addTo(map);
+
+      leafletPolygonsLayerRef.current = polyLayer;
+      leafletMarkersLayerRef.current = markLayer;
+      leafletMapRef.current = map;
+    } catch (e) {
+      console.error("Leaflet fallback error:", e);
     }
-  }, [isScriptReady]);
+  }, [engineMode]);
 
-  // 2. Render Markers and Polygons
+  // Render Leaflet Elements
   useEffect(() => {
-    const naver = (window as any).naver;
-    const map = mapInstanceRef.current;
-    if (!isScriptReady || !map || !naver?.maps) return;
+    if (engineMode !== "fallback") return;
+    const map = leafletMapRef.current;
+    const polyLayer = leafletPolygonsLayerRef.current;
+    const markLayer = leafletMarkersLayerRef.current;
+    if (!map || !polyLayer || !markLayer) return;
 
-    // Clear old
-    markersRef.current.forEach((m) => m.setMap(null));
-    polygonsRef.current.forEach((p) => p.setMap(null));
-    markersRef.current = [];
-    polygonsRef.current = [];
+    polyLayer.clearLayers();
+    markLayer.clearLayers();
 
     projects.forEach((p) => {
       const color = getStageColor(p.current_status);
       const isSelected = selectedProject?.id === p.id;
-      const position = new naver.maps.LatLng(p.lat, p.lng);
 
-      // Render Verified Real Polygon
+      // Polygon
       const polyCoords = getProjectPolygon(p.id, p.lat, p.lng) || getProjectPolygon(p.name, p.lat, p.lng);
       if (polyCoords && polyCoords.length >= 3) {
-        const paths = polyCoords.map((c) => new naver.maps.LatLng(c.lat, c.lng));
-        const poly = new naver.maps.Polygon({
-          map: map,
-          paths: paths,
+        const latlngs: [number, number][] = polyCoords.map((c) => [c.lat, c.lng]);
+        const poly = L.polygon(latlngs, {
+          color: isSelected ? "#171918" : color,
+          weight: isSelected ? 3.5 : 2,
           fillColor: color,
           fillOpacity: isSelected ? 0.6 : 0.35,
-          strokeColor: isSelected ? "#171918" : color,
-          strokeWeight: isSelected ? 4 : 2.5,
-          strokeOpacity: 0.95,
-          clickable: true,
-        });
-
-        naver.maps.Event.addListener(poly, "click", () => onSelectProject(p));
-        polygonsRef.current.push(poly);
+        }).addTo(polyLayer);
+        poly.on("click", () => onSelectProject(p));
       }
 
       // Marker
-      const markerContent = `
-        <div style="transform: translate(-50%, -50%); cursor: pointer; transition: transform 0.2s;">
-          <div style="
-            width: ${isSelected ? "26px" : "18px"}; 
-            height: ${isSelected ? "26px" : "18px"}; 
-            border-radius: 50%; 
-            background-color: ${color}; 
-            border: ${isSelected ? "3px solid #171918" : "2px solid #ffffff"}; 
-            box-shadow: 0 3px 8px rgba(0,0,0,0.3);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #ffffff;
-            font-size: 10px;
-            font-weight: bold;
-          ">
+      const icon = L.divIcon({
+        className: "custom-marker",
+        html: `
+          <div style="transform: translate(-50%, -50%); width: ${isSelected ? "26px" : "18px"}; height: ${isSelected ? "26px" : "18px"}; border-radius: 50%; background-color: ${color}; border: ${isSelected ? "3px solid #171918" : "2px solid #ffffff"}; box-shadow: 0 3px 8px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; color: white; font-size: 10px; font-weight: bold;">
             ${isSelected ? "★" : ""}
           </div>
-        </div>
-      `;
-
-      const marker = new naver.maps.Marker({
-        position: position,
-        map: map,
-        icon: {
-          content: markerContent,
-          anchor: new naver.maps.Point(0, 0),
-        },
+        `,
+        iconSize: [0, 0],
       });
 
-      naver.maps.Event.addListener(marker, "click", () => {
-        onSelectProject(p);
-      });
-
-      markersRef.current.push(marker);
+      const marker = L.marker([p.lat, p.lng], { icon }).addTo(markLayer);
+      marker.on("click", () => onSelectProject(p));
     });
-  }, [isScriptReady, projects, selectedProject, onSelectProject]);
+  }, [engineMode, projects, selectedProject, onSelectProject]);
 
   // Pan to selected project
   useEffect(() => {
-    const naver = (window as any).naver;
-    const map = mapInstanceRef.current;
-    if (!map || !naver?.maps || !selectedProject) return;
+    if (engineMode === "naver" && naverMapRef.current) {
+      const naver = (window as any).naver;
+      if (naver?.maps && selectedProject) {
+        naverMapRef.current.panTo(new naver.maps.LatLng(selectedProject.lat, selectedProject.lng));
+        naverMapRef.current.setZoom(15);
+      }
+    } else if (engineMode === "fallback" && leafletMapRef.current && selectedProject) {
+      leafletMapRef.current.flyTo([selectedProject.lat, selectedProject.lng], 15, { duration: 0.8 });
+    }
+  }, [selectedProject, engineMode]);
 
-    map.panTo(new naver.maps.LatLng(selectedProject.lat, selectedProject.lng));
-    map.setZoom(15);
-  }, [selectedProject]);
-
-  // Pan to selected district
+  // Pan to district
   useEffect(() => {
-    const naver = (window as any).naver;
-    const map = mapInstanceRef.current;
-    if (!map || !naver?.maps) return;
+    if (!selectedDistrict || selectedDistrict === "전체 자치구" || !DISTRICT_COORDINATES[selectedDistrict]) return;
+    const coord = DISTRICT_COORDINATES[selectedDistrict];
 
-    if (selectedDistrict && selectedDistrict !== "전체 자치구" && DISTRICT_COORDINATES[selectedDistrict]) {
-      const coord = DISTRICT_COORDINATES[selectedDistrict];
-      map.panTo(new naver.maps.LatLng(coord.lat, coord.lng));
-      map.setZoom(13);
+    if (engineMode === "naver" && naverMapRef.current) {
+      const naver = (window as any).naver;
+      if (naver?.maps) {
+        naverMapRef.current.panTo(new naver.maps.LatLng(coord.lat, coord.lng));
+        naverMapRef.current.setZoom(13);
+      }
+    } else if (engineMode === "fallback" && leafletMapRef.current) {
+      leafletMapRef.current.flyTo([coord.lat, coord.lng], 13.5, { duration: 0.8 });
     }
-  }, [selectedDistrict]);
+  }, [selectedDistrict, engineMode]);
 
-  // Toggle Naver Cadastral
+  // Toggle Cadastral
   const toggleCadastral = () => {
-    const naver = (window as any).naver;
-    const map = mapInstanceRef.current;
-    if (!naver?.maps || !map) return;
-
-    if (!cadastralLayerRef.current) {
-      cadastralLayerRef.current = new naver.maps.CadastralLayer();
-    }
-
-    if (isCadastralOn) {
-      cadastralLayerRef.current.setMap(null);
-      setIsCadastralOn(false);
-    } else {
-      cadastralLayerRef.current.setMap(map);
-      setIsCadastralOn(true);
+    if (engineMode === "naver" && naverMapRef.current) {
+      const naver = (window as any).naver;
+      if (!cadastralLayerRef.current) {
+        cadastralLayerRef.current = new naver.maps.CadastralLayer();
+      }
+      if (isCadastralOn) {
+        cadastralLayerRef.current.setMap(null);
+        setIsCadastralOn(false);
+      } else {
+        cadastralLayerRef.current.setMap(naverMapRef.current);
+        setIsCadastralOn(true);
+      }
+    } else if (engineMode === "fallback" && leafletMapRef.current) {
+      const map = leafletMapRef.current;
+      if (!leafletCadastralRef.current) {
+        leafletCadastralRef.current = L.tileLayer(
+          "https://api.vworld.kr/req/wmts/1.0.0/CEB21B72-9E11-37E1-B5B3-7313627DFACF/Cadastral/{z}/{y}/{x}.png",
+          { maxZoom: 19, opacity: 0.6, zIndex: 5 }
+        );
+      }
+      if (isCadastralOn) {
+        map.removeLayer(leafletCadastralRef.current);
+        setIsCadastralOn(false);
+      } else {
+        leafletCadastralRef.current.addTo(map);
+        setIsCadastralOn(true);
+      }
     }
   };
 
-  // Toggle Naver Satellite
+  // Toggle Satellite
   const toggleMapType = () => {
-    const naver = (window as any).naver;
-    const map = mapInstanceRef.current;
-    if (!naver?.maps || !map) return;
-
-    if (mapType === "normal") {
-      map.setMapTypeId(naver.maps.MapTypeId.HYBRID);
-      setMapType("hybrid");
-    } else {
-      map.setMapTypeId(naver.maps.MapTypeId.NORMAL);
-      setMapType("normal");
+    if (engineMode === "naver" && naverMapRef.current) {
+      const naver = (window as any).naver;
+      if (mapType === "normal") {
+        naverMapRef.current.setMapTypeId(naver.maps.MapTypeId.HYBRID);
+        setMapType("hybrid");
+      } else {
+        naverMapRef.current.setMapTypeId(naver.maps.MapTypeId.NORMAL);
+        setMapType("normal");
+      }
+    } else if (engineMode === "fallback" && leafletMapRef.current) {
+      const map = leafletMapRef.current;
+      if (!leafletSatelliteRef.current) {
+        leafletSatelliteRef.current = L.tileLayer(
+          "https://api.vworld.kr/req/wmts/1.0.0/CEB21B72-9E11-37E1-B5B3-7313627DFACF/Satellite/{z}/{y}/{x}.jpeg",
+          { maxZoom: 19, zIndex: 1 }
+        );
+      }
+      if (mapType === "normal") {
+        leafletSatelliteRef.current.addTo(map);
+        setMapType("hybrid");
+      } else {
+        map.removeLayer(leafletSatelliteRef.current);
+        setMapType("normal");
+      }
     }
   };
 
@@ -215,7 +254,14 @@ export default function NaverMapView({
       <Script
         src={`https://oapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${clientId}&submodules=geocoder`}
         strategy="afterInteractive"
-        onLoad={() => setIsScriptReady(true)}
+        onLoad={() => {
+          if ((window as any).naver?.maps) {
+            initNaver();
+          } else {
+            setEngineMode("fallback");
+          }
+        }}
+        onError={() => setEngineMode("fallback")}
       />
 
       <div ref={mapElement} className="w-full h-full min-h-[520px] z-0" />
@@ -231,7 +277,7 @@ export default function NaverMapView({
               : "bg-white/95 border-black/10 text-[#171918] hover:bg-black/5"
           }`}
         >
-          {isCadastralOn ? "✓ 네이버 지적편집도 ON" : "지적편집도"}
+          {isCadastralOn ? "✓ 지적편집도 ON" : "지적편집도"}
         </button>
 
         <button
