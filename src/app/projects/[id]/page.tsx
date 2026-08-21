@@ -6,6 +6,8 @@ import ProjectSpecsCard from "@/components/ProjectSpecsCard";
 import FeasibilityCalculator from "@/components/FeasibilityCalculator";
 import ProjectEventsTimeline from "@/components/ProjectEventsTimeline";
 import ProjectMapSection from "@/components/ProjectMapSection";
+import ProjectRiskRadar from "@/components/ProjectRiskRadar";
+import ProjectPdfReportButton from "@/components/ProjectPdfReportButton";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { calculateStagePipeline } from "@/lib/utils/stages";
 import { getNaverMapUrl } from "@/lib/utils/map";
@@ -145,7 +147,14 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
         <section className="pt-14">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <p className="text-sm font-semibold tracking-[0.12em] text-[#e6523a]">PROJECT PROFILE</p>
-            <SubscriptionButton projectId={project.id} />
+            <div className="flex items-center gap-2 print:hidden">
+              <ProjectPdfReportButton
+                projectName={project.name}
+                district={project.district}
+                currentStatus={project.current_status}
+              />
+              <SubscriptionButton projectId={project.id} />
+            </div>
           </div>
           <h1 className="mt-3 max-w-3xl text-4xl font-semibold tracking-[-0.055em] sm:text-5xl">{project.name}</h1>
           <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -154,14 +163,14 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
               href={naverMapUrl}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-600/20 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-800 transition hover:bg-emerald-100 shadow-2xs"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-600/20 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-800 transition hover:bg-emerald-100 shadow-2xs print:hidden"
             >
               <span className="text-sm">🗺️</span>
               <span>네이버 지도로 위치 보기 ↗</span>
             </a>
             <Link
               href={`/compare?p1=${project.id}`}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-black/10 bg-white px-3 py-1 text-xs font-bold text-[#171918] transition hover:bg-[#f7f7f4] shadow-2xs"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-black/10 bg-white px-3 py-1 text-xs font-bold text-[#171918] transition hover:bg-[#f7f7f4] shadow-2xs print:hidden"
             >
               <span>⚔️</span>
               <span>다른 구역과 1:1 비교하기 ➔</span>
@@ -231,7 +240,17 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
           />
         </section>
 
-        {/* Section 3: Stage Pipeline & Events Timeline */}
+        {/* Section 3: Risk Radar */}
+        <section className="mt-10">
+          <ProjectRiskRadar
+            projectName={project.name}
+            district={project.district}
+            currentStatus={project.current_status}
+            projectType={project.project_type}
+          />
+        </section>
+
+        {/* Section 4: Stage Pipeline & Events Timeline */}
         <section className="mt-10 grid gap-8 lg:grid-cols-[1.1fr_1.3fr] items-start">
           {/* 7-Step Stage Pipeline */}
           <div>
