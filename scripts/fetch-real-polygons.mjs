@@ -1,18 +1,21 @@
 /**
- * VWorld "(연속주제)_도시및주거환경정비/정비구역" SHP를 파싱해 검증된 정비구역
- * 경계 폴리곤을 src/lib/data/project-polygons.ts 에 기록한다.
+ * VWorld 국토교통부 정비 관련 연속주제도 SHP들을 파싱해 검증된 구역 경계
+ * 폴리곤을 src/lib/data/project-polygons.ts 에 기록한다. 두 데이터셋을 함께 쓴다:
  *
- * 원본: https://www.vworld.kr/dtmk/dtmk_ntads_s002.do?dsId=30335 (국토교통부)
- * 도시 및 주거환경정비법 제16조에 따라 지정·고시된 구역의 실측 경계다.
+ *   - UD602 "(연속주제)_도시및주거환경정비/정비구역" (dsId=30335)
+ *     도시 및 주거환경정비법 제16조에 따라 지정·고시된 구역
+ *   - UD603 "(연속주제)_도시재정비/재정비촉진지구" (dsId=30337)
+ *     도시재정비 촉진을 위한 특별법 제5조에 따라 지정하는 지구(뉴타운) — 단, 이
+ *     데이터셋에도 한남뉴타운처럼 누락된 구역이 있다(VWorld 데이터 자체의 공백).
  *
  * 다운로드는 VWorld 로그인이 필요해 스크립트로 자동화할 수 없다. 수동으로
- * 로그인 후 서울 SHP(zip)를 받아 data/vworld/ 에 압축을 풀어둔 뒤 이 스크립트를
- * 실행한다. 원본 파일은 라이선스가 불명확해 저장소에는 커밋하지 않는다
- * (.gitignore의 /data/ 참고).
+ * 로그인 후 https://www.vworld.kr/dtmk/dtmk_ntads_s001.do 에서 서울 SHP(zip)를
+ * 받아 data/vworld/ 에 압축을 풀어둔 뒤 이 스크립트를 실행한다. 원본 파일은
+ * 라이선스가 불명확해 저장소에는 커밋하지 않는다 (.gitignore의 /data/ 참고).
  *
  * Usage:
- *   node scripts/fetch-real-polygons.mjs [shp 파일 경로 접두어(확장자 제외)]
- *   기본값: data/vworld/LSMD_CONT_UD602_5174_11_202608
+ *   node scripts/fetch-real-polygons.mjs [shp 파일 경로 접두어(확장자 제외)...]
+ *   인자를 안 주면 data/vworld/ 에서 찾은 UD602, UD603 서울 SHP를 모두 사용한다.
  */
 
 import shapefile from "shapefile";
@@ -24,7 +27,12 @@ proj4.defs(
   "+proj=tmerc +lat_0=38 +lon_0=127.0028902777778 +k=1 +x_0=200000 +y_0=500000 +ellps=bessel +units=m +no_defs +towgs84=-115.80,474.99,674.11,1.16,-2.31,-1.63,6.43"
 );
 
-const inputBase = process.argv[2] ?? "data/vworld/LSMD_CONT_UD602_5174_11_202608";
+const inputBases = process.argv.length > 2
+  ? process.argv.slice(2)
+  : [
+      "data/vworld/LSMD_CONT_UD602_5174_11_202608",
+      "data/vworld/LSMD_CONT_UD603_5174_11_202608",
+    ];
 const outputFile = "src/lib/data/project-polygons.ts";
 
 function ringArea(ring) {
@@ -66,32 +74,54 @@ function stripGenericTokens(name) {
   return stripped;
 }
 
-const source = await shapefile.open(`${inputBase}.shp`, `${inputBase}.dbf`, { encoding: "euc-kr" });
+// VWorld UD603(재정비촉진지구) 원본에 REMARK/ALIAS가 비어 있는 레코드가 있다.
+// 이 MNUM은 도형 중심좌표가 한남동(용산구, COL_ADM_SE=11170) 안에 들어오는 것을
+// 직접 확인했고, 사용자가 한남뉴타운의 공식 명칭(한남재정비촉진지구, 하위
+// 제1~5재정비촉진구역)을 확인해줬다. 도형은 국토부 원본 그대로이고 라벨만 채워
+// 넣는 것이라 "추정 폴리곤"이 아니다. 다만 이 SHP에는 지구 전체 외곽선 하나만
+// 있고 1~5구역 개별 경계로 나뉘어 있지 않아, 실제 DB 사업장명이 무엇이든 걸리도록
+// 지구명과 구역별 이름 후보를 모두 같은 도형에 매핑해 둔다.
+const MANUAL_NAME_OVERRIDES_BY_MNUM = {
+  "61100001117020190362UDA1000001002": [
+    "한남재정비촉진지구",
+    "한남1구역", "한남 제1재정비촉진구역",
+    "한남2구역", "한남 제2재정비촉진구역",
+    "한남3구역", "한남 제3재정비촉진구역",
+    "한남4구역", "한남 제4재정비촉진구역",
+    "한남5구역", "한남 제5재정비촉진구역",
+  ],
+};
 
 const best = new Map(); // 구역명 -> { area, ring }
 let total = 0;
-let result = await source.read();
-while (!result.done) {
-  total++;
-  const { properties, geometry } = result.value;
-  const name = (properties.REMARK && properties.REMARK.trim()) || (properties.ALIAS && properties.ALIAS.trim());
-  // DBF에 소수 레코드가 EUC-KR이 아닌 다른 인코딩으로 들어있어 깨진 문자열이 생긴다.
-  // 이름을 신뢰할 수 없으므로 매칭에 쓰지 않고 건너뛴다.
-  const isMojibake = name && [...name].some((ch) => ch.charCodeAt(0) === 0xfffd || ch.charCodeAt(0) === 0xff1f);
-  // 두 조건을 모두 요구한다: (1) 정비/재건축 관련 단어가 있어야 하고 (2) 그 단어들을
-  // 다 걷어내도 지명으로 보이는 글자가 남아야 한다. 하나만으로는 "입안", "행위제한",
-  // "주택과문의" 같은 지명 없는 순수 행정 문구를 걸러내지 못한다.
-  const hasDistrictKeyword = name && /구역|정비|재건축|재개발|지구|마을/.test(name);
-  const hasSpecificPlaceName = name && hasDistrictKeyword && stripGenericTokens(name).length >= 2;
-  if (name && !isMojibake && hasSpecificPlaceName) {
-    const ring = largestRing(geometry);
-    if (ring.length >= 4) {
-      const area = ringArea(ring);
-      const existing = best.get(name);
-      if (!existing || area > existing.area) best.set(name, { area, ring });
+for (const inputBase of inputBases) {
+  const source = await shapefile.open(`${inputBase}.shp`, `${inputBase}.dbf`, { encoding: "euc-kr" });
+  let result = await source.read();
+  while (!result.done) {
+    total++;
+    const { properties, geometry } = result.value;
+    const name = (properties.REMARK && properties.REMARK.trim()) || (properties.ALIAS && properties.ALIAS.trim());
+    const overrideNames = MANUAL_NAME_OVERRIDES_BY_MNUM[properties.MNUM];
+    // DBF에 소수 레코드가 EUC-KR이 아닌 다른 인코딩으로 들어있어 깨진 문자열이 생긴다.
+    // 이름을 신뢰할 수 없으므로 매칭에 쓰지 않고 건너뛴다.
+    const isMojibake = name && [...name].some((ch) => ch.charCodeAt(0) === 0xfffd || ch.charCodeAt(0) === 0xff1f);
+    // 두 조건을 모두 요구한다: (1) 정비/재건축 관련 단어가 있어야 하고 (2) 그 단어들을
+    // 다 걷어내도 지명으로 보이는 글자가 남아야 한다. 하나만으로는 "입안", "행위제한",
+    // "주택과문의" 같은 지명 없는 순수 행정 문구를 걸러내지 못한다.
+    const hasDistrictKeyword = name && /구역|정비|재건축|재개발|지구|마을/.test(name);
+    const hasSpecificPlaceName = name && hasDistrictKeyword && stripGenericTokens(name).length >= 2;
+    if (overrideNames || (name && !isMojibake && hasSpecificPlaceName)) {
+      const ring = largestRing(geometry);
+      if (ring.length >= 4) {
+        const area = ringArea(ring);
+        for (const registeredName of overrideNames ?? [name]) {
+          const existing = best.get(registeredName);
+          if (!existing || area > existing.area) best.set(registeredName, { area, ring });
+        }
+      }
     }
+    result = await source.read();
   }
-  result = await source.read();
 }
 
 const entries = [...best.entries()]
