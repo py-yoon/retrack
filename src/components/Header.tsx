@@ -23,14 +23,6 @@ export default function Header() {
         <nav className="hidden sm:flex items-center gap-5 text-sm font-medium">
           <Link
             className={`transition ${
-              pathname === "/check" ? "font-semibold text-[#e6523a]" : "text-[#444] hover:text-[#171918]"
-            }`}
-            href="/check"
-          >
-            🔍 구역 진단기
-          </Link>
-          <Link
-            className={`transition ${
               pathname === "/map" ? "font-semibold text-[#e6523a]" : "text-[#444] hover:text-[#171918]"
             }`}
             href="/map"
