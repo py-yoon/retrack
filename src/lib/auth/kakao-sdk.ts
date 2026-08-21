@@ -53,7 +53,10 @@ export function loadKakaoSdk(): Promise<boolean> {
     isKakaoLoading = true;
     const script = document.createElement("script");
     script.src = "https://t1.kakaocdn.net/kakao_js_sdk/2.7.2/kakao.min.js";
-    script.integrity = "sha384-TiCUE00h649CAMonG018J2m00A/+230dxuNiHYEax0pgXGQbBq15P+4i9Y5B322b";
+    // 기존 해시가 실제 CDN 파일과 달라 SRI 검증에 걸려 스크립트 로드 자체가
+    // 조용히 실패하고 있었다(콘솔엔 "Failed to load Kakao SDK script"만 남음).
+    // curl로 해당 CDN 파일을 직접 받아 sha384 재계산해 바로잡았다.
+    script.integrity = "sha384-TiCUE00h649CAMonG018J2ujOgDKW/kVWlChEuu4jK2vxfAAD0eZxzCKakxg55G4";
     script.crossOrigin = "anonymous";
     script.async = true;
 
