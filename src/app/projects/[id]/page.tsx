@@ -1,3 +1,4 @@
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import Header from "@/components/Header";
 import SubscriptionButton from "@/components/SubscriptionButton";
@@ -5,12 +6,23 @@ import StagePipeline from "@/components/StagePipeline";
 import ProjectSpecsCard from "@/components/ProjectSpecsCard";
 import FeasibilityCalculator from "@/components/FeasibilityCalculator";
 import ProjectEventsTimeline from "@/components/ProjectEventsTimeline";
-import ProjectDetailMap from "@/components/ProjectDetailMap";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { calculateStagePipeline } from "@/lib/utils/stages";
 import { getNaverMapUrl } from "@/lib/utils/map";
 import { getProjectCoordinates } from "@/lib/utils/coordinates";
 import { getProjectPolygon } from "@/lib/data/project-polygons";
+
+const ProjectDetailMap = dynamic(
+  () => import("@/components/ProjectDetailMap"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center min-h-[380px] bg-[#f5f5f1] rounded-2xl text-xs text-[#777a76] animate-pulse border border-black/5">
+        🗺️ 네이버 지도 및 구역 폴리곤을 로드하는 중입니다...
+      </div>
+    ),
+  }
+);
 
 type ProjectPageProps = { params: Promise<{ id: string }> };
 
