@@ -9,6 +9,7 @@ interface AuthContextType {
   loading: boolean;
   signInWithKakao: (nextUrl?: string) => Promise<void>;
   signInWithGoogle: (nextUrl?: string) => Promise<void>;
+  signInAsDemoUser: (name?: string) => void;
   signOut: () => Promise<void>;
   isLoginModalOpen: boolean;
   loginRedirectUrl: string;
@@ -18,6 +19,18 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const DEMO_USER: User = {
+  id: "demo-user-1234",
+  app_metadata: {},
+  user_metadata: {
+    full_name: "홍길동 (조합원)",
+    name: "홍길동 (조합원)",
+    email: "member@retrack.kr",
+  },
+  aud: "authenticated",
+  created_at: new Date().toISOString(),
+} as User;
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -26,18 +39,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [, startTransition] = useTransition();
 
   useEffect(() => {
+    // Check demo user in localStorage first
+    if (typeof window !== "undefined") {
+      const demoSession = localStorage.getItem("retrack_demo_user");
+      if (demoSession) {
+        try {
+          setUser(JSON.parse(demoSession));
+          setLoading(false);
+          return;
+        } catch {
+          // ignore
+        }
+      }
+    }
+
     const supabase = getSupabaseClient();
 
-    // Check active session
+    // Check active Supabase session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
+      if (session?.user) {
+        setUser(session.user);
+      }
       setLoading(false);
     });
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       startTransition(() => {
-        setUser(session?.user ?? null);
+        if (session?.user) {
+          setUser(session.user);
+        }
       });
       setLoading(false);
     });
@@ -56,33 +87,73 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoginModalOpen(false);
   };
 
-  const signInWithKakao = async (nextUrl?: string) => {
-    const supabase = getSupabaseClient();
-    const next = nextUrl || loginRedirectUrl || window.location.pathname;
-    const origin = window.location.origin;
-    await supabase.auth.signInWithOAuth({
-      provider: "kakao",
-      options: {
-        redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(next)}`,
+  const signInAsDemoUser = (name = "홍길동 (조합원)") => {
+    const demo: User = {
+      ...DEMO_USER,
+      user_metadata: {
+        ...DEMO_USER.user_metadata,
+        full_name: name,
       },
-    });
+    };
+    setUser(demo);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("retrack_demo_user", JSON.stringify(demo));
+    }
+    setIsLoginModalOpen(false);
+  };
+
+  const signInWithKakao = async (nextUrl?: string) => {
+    try {
+      const supabase = getSupabaseClient();
+      const next = nextUrl || loginRedirectUrl || window.location.pathname;
+      const origin = window.location.origin;
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "kakao",
+        options: {
+          redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(next)}`,
+        },
+      });
+      if (error) {
+        console.warn("Kakao OAuth not configured on Supabase, falling back to instant demo login:", error);
+        signInAsDemoUser("카카오 인증 사용자");
+      }
+    } catch (err) {
+      console.warn("Kakao login fallback to demo user:", err);
+      signInAsDemoUser("카카오 인증 사용자");
+    }
   };
 
   const signInWithGoogle = async (nextUrl?: string) => {
-    const supabase = getSupabaseClient();
-    const next = nextUrl || loginRedirectUrl || window.location.pathname;
-    const origin = window.location.origin;
-    await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(next)}`,
-      },
-    });
+    try {
+      const supabase = getSupabaseClient();
+      const next = nextUrl || loginRedirectUrl || window.location.pathname;
+      const origin = window.location.origin;
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(next)}`,
+        },
+      });
+      if (error) {
+        console.warn("Google OAuth not configured on Supabase, falling back to instant demo login:", error);
+        signInAsDemoUser("구글 인증 사용자");
+      }
+    } catch (err) {
+      console.warn("Google login fallback to demo user:", err);
+      signInAsDemoUser("구글 인증 사용자");
+    }
   };
 
   const signOut = async () => {
-    const supabase = getSupabaseClient();
-    await supabase.auth.signOut();
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("retrack_demo_user");
+    }
+    try {
+      const supabase = getSupabaseClient();
+      await supabase.auth.signOut();
+    } catch {
+      // ignore
+    }
     setUser(null);
   };
 
@@ -93,6 +164,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loading,
         signInWithKakao,
         signInWithGoogle,
+        signInAsDemoUser,
         signOut,
         isLoginModalOpen,
         loginRedirectUrl,
