@@ -44,6 +44,28 @@ function largestRing(geometry) {
   return rings.reduce((best, ring) => (ringArea(ring) > ringArea(best) ? ring : best));
 }
 
+// 정비/재건축/재개발 도메인에서 흔히 쓰이는 순수 범주어. REMARK/ALIAS에 구체적인
+// 지명 없이 이 단어들만 조합돼 들어있는 레코드가 있는데("정비구역", "재정비촉진구역",
+// "주택재개발" 등), 이런 이름은 실제 서울 어느 구역에도 붙일 수 있는 값이라 런타임의
+// 부분일치 매칭과 만나면 완전히 엉뚱한 동네에 폴리곤이 뜬다(예: "한남3구역"이 원거리의
+// 무명 "재정비촉진구역" 레코드와 매칭). 이 단어들을 모두 제거했을 때 지명/번지로 보이는
+// 글자가 2자 이상 남지 않으면 지명이 없는 것으로 보고 제외한다.
+const GENERIC_TOKENS = [
+  "도시환경정비사업", "도시환경정비구역", "도시환경정비", "주택재건축정비구역", "주택재개발구역",
+  "주택재건축사업", "주택재개발사업", "재건축사업정비구역", "재건축정비구역", "재개발정비구역",
+  "재건축정비예정구역", "정비예정구역", "재정비촉진구역", "재정비촉진지구", "주거환경개선지구",
+  "주거환경개선구역", "주거환경관리사업", "건축허가제한구역", "시장정비사업구역", "소단위관리지구",
+  "특별건축구역", "주택재건축", "주택재개발", "재건축", "재개발", "도시환경", "정비구역", "정비사업",
+  "정비계획", "지형도면", "지정", "고시", "수립", "구역", "지구", "사업", "정비", "마을",
+  "행위제한", "입안", "문의", "주택과", "도시계획과", "도시재생과", "신속추진단", "허가", "제한",
+  ":주택과", ":도시계획과", ":도시재생과", "_안", "(안)", "(", ")", "-", " ",
+];
+function stripGenericTokens(name) {
+  let stripped = name;
+  for (const token of GENERIC_TOKENS) stripped = stripped.split(token).join("");
+  return stripped;
+}
+
 const source = await shapefile.open(`${inputBase}.shp`, `${inputBase}.dbf`, { encoding: "euc-kr" });
 
 const best = new Map(); // 구역명 -> { area, ring }
@@ -56,10 +78,12 @@ while (!result.done) {
   // DBF에 소수 레코드가 EUC-KR이 아닌 다른 인코딩으로 들어있어 깨진 문자열이 생긴다.
   // 이름을 신뢰할 수 없으므로 매칭에 쓰지 않고 건너뛴다.
   const isMojibake = name && [...name].some((ch) => ch.charCodeAt(0) === 0xfffd || ch.charCodeAt(0) === 0xff1f);
-  // REMARK/ALIAS에는 실제 구역명 대신 "자세한 사항은 ~과에 문의" 같은 행정 비고문이
-  // 들어있는 경우가 있다. 사업장명과 절대 매칭될 수 없는 순수 잡음이라 제외한다.
-  const looksLikeDistrictName = name && /구역|정비|재건축|재개발|지구|마을/.test(name);
-  if (name && !isMojibake && looksLikeDistrictName) {
+  // 두 조건을 모두 요구한다: (1) 정비/재건축 관련 단어가 있어야 하고 (2) 그 단어들을
+  // 다 걷어내도 지명으로 보이는 글자가 남아야 한다. 하나만으로는 "입안", "행위제한",
+  // "주택과문의" 같은 지명 없는 순수 행정 문구를 걸러내지 못한다.
+  const hasDistrictKeyword = name && /구역|정비|재건축|재개발|지구|마을/.test(name);
+  const hasSpecificPlaceName = name && hasDistrictKeyword && stripGenericTokens(name).length >= 2;
+  if (name && !isMojibake && hasSpecificPlaceName) {
     const ring = largestRing(geometry);
     if (ring.length >= 4) {
       const area = ringArea(ring);
@@ -110,9 +134,12 @@ export function getProjectPolygon(
     return VERIFIED_REAL_POLYGONS[projectId];
   }
 
-  // Name / keyword matching for major projects
+  // Name / keyword matching for major projects. Keys shorter than 4 characters
+  // are too generic to safely substring-match against arbitrary project names
+  // (e.g. a bare category label matching an unrelated district by accident).
   const norm = projectId.replaceAll(/\\s+/g, "").toLowerCase();
   for (const [key, coords] of Object.entries(VERIFIED_REAL_POLYGONS)) {
+    if (key.length < 4) continue;
     if (norm.includes(key.toLowerCase()) || key.toLowerCase().includes(norm)) {
       return coords;
     }
