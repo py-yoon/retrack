@@ -8,6 +8,7 @@ import ProjectEventsTimeline from "@/components/ProjectEventsTimeline";
 import ProjectMapSection from "@/components/ProjectMapSection";
 import ProjectRiskRadar from "@/components/ProjectRiskRadar";
 import ProjectPdfReportButton from "@/components/ProjectPdfReportButton";
+import MembershipEligibilityCard from "@/components/MembershipEligibilityCard";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { calculateStagePipeline } from "@/lib/utils/stages";
 import { getNaverMapUrl } from "@/lib/utils/map";
@@ -220,7 +221,17 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
           polygon={polygonCoords}
         />
 
-        {/* Section 1: Specs & Architectural Design */}
+        {/* Section 1: Membership Eligibility & Liquidation Shield */}
+        <section className="mt-10">
+          <MembershipEligibilityCard
+            projectName={project.name}
+            district={project.district}
+            projectType={project.project_type}
+            currentStatus={project.current_status}
+          />
+        </section>
+
+        {/* Section 2: Specs & Architectural Design */}
         <section className="mt-10">
           <ProjectSpecsCard
             projectName={project.name}
