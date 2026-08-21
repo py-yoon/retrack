@@ -88,7 +88,12 @@ export type KakaoUserProfile = {
   email?: string;
 };
 
-export async function loginWithKakaoDirect(): Promise<KakaoUserProfile | null> {
+// 카카오 JS SDK v2는 팝업으로 바로 프로필을 받아오던 v1의 Auth.login()을 더 이상
+// 지원하지 않는다(카카오 공식 문서 확인, 2026-08-21). 지금은 Auth.authorize()로
+// 카카오 로그인 화면으로 리다이렉트한 뒤, 카카오가 redirectUri로 돌려주는 인가
+// 코드를 서버(src/app/auth/kakao/callback/route.ts)에서 토큰으로 교환해야 한다.
+// 이 함수는 리다이렉트를 시작만 하고 반환하지 않는다(페이지가 이동한다).
+export async function redirectToKakaoLogin(redirectUri: string, state?: string): Promise<void> {
   const isLoaded = await loadKakaoSdk();
   if (!isLoaded || !window.Kakao) {
     throw new Error(
@@ -97,34 +102,5 @@ export async function loginWithKakaoDirect(): Promise<KakaoUserProfile | null> {
         : "카카오 로그인이 아직 설정되지 않았습니다. (관리자: NEXT_PUBLIC_KAKAO_JS_KEY 설정 필요)"
     );
   }
-
-  return new Promise((resolve, reject) => {
-    window.Kakao.Auth.login({
-      success: function (authObj: any) {
-        window.Kakao.API.request({
-          url: "/v2/user/me",
-          success: function (res: any) {
-            const nickname = res.kakao_account?.profile?.nickname || "카카오 사용자";
-            const profileImage = res.kakao_account?.profile?.profile_image_url;
-            const email = res.kakao_account?.email || `kakao_${res.id}@retrack.kr`;
-
-            resolve({
-              id: String(res.id),
-              nickname,
-              profileImage,
-              email,
-            });
-          },
-          fail: function (error: any) {
-            console.warn("Kakao API request failed:", error);
-            reject(error);
-          },
-        });
-      },
-      fail: function (err: any) {
-        console.warn("Kakao Auth.login failed:", err);
-        reject(err);
-      },
-    });
-  });
+  window.Kakao.Auth.authorize({ redirectUri, state });
 }
