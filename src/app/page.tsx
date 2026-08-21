@@ -191,37 +191,40 @@ export default function Home() {
               }));
 
             const combined = [...(data ?? []), ...fallbackMatches];
-            const dedup = Array.from(new Map(combined.map((item) => [item.id, item])).values()).slice(0, 10);
+            
+            // Smart Deduplication & Relevance Ranking
+            const seenNames = new Set<string>();
+            const uniqueResults: SearchResultItem[] = [];
 
-            setSearchResults(dedup);
-            setIsDropdownOpen(dedup.length > 0);
-          } else {
-            const { data } = await supabase
-              .from("projects")
-              .select("id,name,address,district,project_type,current_status")
-              .or(`name.ilike.%${term}%,address.ilike.%${term}%,district.ilike.%${term}%`)
-              .limit(10);
+            // Sort: exact matches first, then partial matches
+            combined.sort((a, b) => {
+              const aName = a.name.replaceAll(/\s+/g, "").toLowerCase();
+              const bName = b.name.replaceAll(/\s+/g, "").toLowerCase();
+              const cleanT = term.replaceAll(/\s+/g, "").toLowerCase();
 
-            const fallbackMatches = Object.values(ADDRESS_MATCH_DB)
-              .filter((item) => item.name.includes(term) || item.keywords.some((k) => k.includes(term)))
-              .map((item) => ({
-                id: item.id,
-                name: item.name,
-                address: item.district,
-                district: item.district,
-                project_type: "정비사업",
-                current_status: item.stage,
-              }));
+              const aExact = aName === cleanT || aName.startsWith(cleanT);
+              const bExact = bName === cleanT || bName.startsWith(cleanT);
 
-            const combined = [...(data ?? []), ...fallbackMatches];
-            const dedup = Array.from(new Map(combined.map((item) => [item.id, item])).values()).slice(0, 10);
+              if (aExact && !bExact) return -1;
+              if (!aExact && bExact) return 1;
+              return 0;
+            });
 
-            setSearchResults(dedup);
-            setIsDropdownOpen(dedup.length > 0);
+            for (const item of combined) {
+              const normName = item.name.replaceAll(/\s+/g, "").replaceAll("주택재개발", "").replaceAll("정비사업", "").replaceAll("재정비촉진구역", "구역");
+              if (!seenNames.has(normName)) {
+                seenNames.add(normName);
+                uniqueResults.push(item);
+              }
+              if (uniqueResults.length >= 8) break;
+            }
+
+            setSearchResults(uniqueResults);
+            setIsDropdownOpen(uniqueResults.length > 0);
           }
         }
       } catch {
-        // Fallback local match
+        // Fallback local match with deduplication
         const localMatches = Object.values(ADDRESS_MATCH_DB)
           .filter((item) => item.name.includes(term) || item.keywords.some((k) => k.includes(term)))
           .map((item) => ({
@@ -232,8 +235,17 @@ export default function Home() {
             project_type: "정비사업",
             current_status: item.stage,
           }));
-        setSearchResults(localMatches);
-        setIsDropdownOpen(localMatches.length > 0);
+
+        const seen = new Set<string>();
+        const dedupLocal = localMatches.filter((item) => {
+          const norm = item.name.replaceAll(/\s+/g, "");
+          if (seen.has(norm)) return false;
+          seen.add(norm);
+          return true;
+        });
+
+        setSearchResults(dedupLocal);
+        setIsDropdownOpen(dedupLocal.length > 0);
       } finally {
         setIsSearching(false);
       }
