@@ -77,7 +77,7 @@ export default function MembershipEligibilityCard({
 
             <button
               type="button"
-              onClick={openLoginModal}
+              onClick={() => openLoginModal()}
               className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#171918] px-5 py-2.5 text-xs font-bold text-white transition hover:bg-black/80 shadow-sm cursor-pointer"
             >
               <span>⚡</span>
