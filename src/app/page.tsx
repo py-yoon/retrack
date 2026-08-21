@@ -9,6 +9,7 @@ import { getSupabaseClient } from "@/lib/supabase/client";
 import { isPureChosung, matchHangulSearch } from "@/lib/utils/hangul";
 import BuildingLedgerCard from "@/components/BuildingLedgerCard";
 import { getBuildingLedgerInfo, type BuildingLedgerInfo } from "@/lib/data/building-ledger";
+import { searchProjectsFromCatalog, type ProjectCatalogItem } from "@/lib/data/projects-catalog";
 
 type RecentUpdate = {
   id: string;
@@ -148,12 +149,28 @@ export default function Home() {
       return;
     }
 
+    // 1. Instant Catalog Search (0ms response)
+    const catalogMatches = searchProjectsFromCatalog(term).map((p) => ({
+      id: p.id,
+      name: p.name,
+      address: p.address,
+      district: p.district,
+      project_type: p.project_type,
+      current_status: p.current_status,
+    }));
+
+    if (catalogMatches.length > 0) {
+      setSearchResults(catalogMatches);
+      setIsDropdownOpen(true);
+    }
+
     const timer = setTimeout(async () => {
       setIsSearching(true);
       setSelectedIndex(-1);
 
       try {
         const supabase = getSupabaseClient();
+        let dbResults: SearchResultItem[] = [];
 
         // 1. Chosung Search
         if (isPureChosung(term)) {
@@ -162,12 +179,9 @@ export default function Home() {
             .select("id,name,address,district,project_type,current_status")
             .limit(300);
 
-          const matched = (data ?? [])
+          dbResults = (data ?? [])
             .filter((p) => matchHangulSearch(p.name, term) || matchHangulSearch(p.address, term))
             .slice(0, 10);
-
-          setSearchResults(matched);
-          setIsDropdownOpen(matched.length > 0);
         } else {
           // 2. Keyword & Address & Name Search
           const cleanTerm = term.replaceAll("번지", "").replaceAll("일대", "").trim();
@@ -180,79 +194,42 @@ export default function Home() {
               .select("id,name,address,district,project_type,current_status")
               .or(`address.ilike.%${t1}%${t2}%,name.ilike.%${t1}%${t2}%,and(address.ilike.%${t1}%,address.ilike.%${t2}%),and(name.ilike.%${t1}%,name.ilike.%${t2}%)`)
               .limit(10);
-
-            // Also check fallback address DB
-            const fallbackMatches = Object.values(ADDRESS_MATCH_DB)
-              .filter((item) => item.keywords.some((k) => k.includes(t1) || k.includes(t2)))
-              .map((item) => ({
-                id: item.id,
-                name: item.name,
-                address: item.district,
-                district: item.district,
-                project_type: "정비사업",
-                current_status: item.stage,
-              }));
-
-            const combined = [...(data ?? []), ...fallbackMatches];
-            
-            // Smart Deduplication & Relevance Ranking
-            const seenNames = new Set<string>();
-            const uniqueResults: SearchResultItem[] = [];
-
-            // Sort: exact matches first, then partial matches
-            combined.sort((a, b) => {
-              const aName = a.name.replaceAll(/\s+/g, "").toLowerCase();
-              const bName = b.name.replaceAll(/\s+/g, "").toLowerCase();
-              const cleanT = term.replaceAll(/\s+/g, "").toLowerCase();
-
-              const aExact = aName === cleanT || aName.startsWith(cleanT);
-              const bExact = bName === cleanT || bName.startsWith(cleanT);
-
-              if (aExact && !bExact) return -1;
-              if (!aExact && bExact) return 1;
-              return 0;
-            });
-
-            for (const item of combined) {
-              const normName = item.name.replaceAll(/\s+/g, "").replaceAll("주택재개발", "").replaceAll("정비사업", "").replaceAll("재정비촉진구역", "구역");
-              if (!seenNames.has(normName)) {
-                seenNames.add(normName);
-                uniqueResults.push(item);
-              }
-              if (uniqueResults.length >= 8) break;
-            }
-
-            setSearchResults(uniqueResults);
-            setIsDropdownOpen(uniqueResults.length > 0);
+            dbResults = data ?? [];
+          } else {
+            const { data } = await supabase
+              .from("projects")
+              .select("id,name,address,district,project_type,current_status")
+              .or(`name.ilike.%${term}%,address.ilike.%${term}%,district.ilike.%${term}%`)
+              .limit(10);
+            dbResults = data ?? [];
           }
         }
-      } catch {
-        // Fallback local match with deduplication
-        const localMatches = Object.values(ADDRESS_MATCH_DB)
-          .filter((item) => item.name.includes(term) || item.keywords.some((k) => k.includes(term)))
-          .map((item) => ({
-            id: item.id,
-            name: item.name,
-            address: item.district,
-            district: item.district,
-            project_type: "정비사업",
-            current_status: item.stage,
-          }));
 
+        // Combine catalog and DB results
+        const combined = [...catalogMatches, ...dbResults];
         const seen = new Set<string>();
-        const dedupLocal = localMatches.filter((item) => {
-          const norm = item.name.replaceAll(/\s+/g, "");
-          if (seen.has(norm)) return false;
-          seen.add(norm);
-          return true;
-        });
+        const uniqueResults: SearchResultItem[] = [];
 
-        setSearchResults(dedupLocal);
-        setIsDropdownOpen(dedupLocal.length > 0);
+        for (const item of combined) {
+          const norm = item.name.replaceAll(/\s+/g, "").replaceAll("주택재개발", "").replaceAll("정비사업", "").replaceAll("재정비촉진구역", "구역");
+          if (!seen.has(norm)) {
+            seen.add(norm);
+            uniqueResults.push(item);
+          }
+          if (uniqueResults.length >= 8) break;
+        }
+
+        setSearchResults(uniqueResults);
+        setIsDropdownOpen(uniqueResults.length > 0);
+      } catch {
+        if (catalogMatches.length > 0) {
+          setSearchResults(catalogMatches);
+          setIsDropdownOpen(true);
+        }
       } finally {
         setIsSearching(false);
       }
-    }, 200);
+    }, 150);
 
     return () => clearTimeout(timer);
   }, [searchInput]);
@@ -310,6 +287,21 @@ export default function Home() {
     const ledger = getBuildingLedgerInfo(text);
     if (ledger) {
       setBuildingLedger(ledger);
+    }
+
+    // Check Official Project Catalog First
+    const catalogItem = findProjectFromCatalog(text);
+    if (catalogItem) {
+      setDiagnosisResult({
+        status: "INCLUDED",
+        projectName: catalogItem.name,
+        projectId: catalogItem.id,
+        district: catalogItem.district,
+        stage: catalogItem.current_status,
+        message: `[${catalogItem.name}] 공식 정비구역 도면 및 사업지 정보가 확인되었습니다!`,
+        tip: "현재 추진 단계, 실측 네이버 지도, 예상 분담금 및 안전마진 시뮬레이터를 확인하세요.",
+      });
+      return;
     }
 
     let matched: { id: string; name: string; district: string; stage: string } | null = null;

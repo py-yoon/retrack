@@ -16,43 +16,9 @@ import { calculateStagePipeline } from "@/lib/utils/stages";
 import { getNaverMapUrl } from "@/lib/utils/map";
 import { getProjectCoordinates } from "@/lib/utils/coordinates";
 import { getProjectPolygon } from "@/lib/data/project-polygons";
+import { findProjectFromCatalog } from "@/lib/data/projects-catalog";
 
 type ProjectPageProps = { params: Promise<{ id: string }> };
-
-const MOCK_PROJECTS: Record<string, any> = {
-  "cb005e1e-cad8-4c15-bd80-e6ce42a7a400": {
-    id: "cb005e1e-cad8-4c15-bd80-e6ce42a7a400",
-    name: "마포로1-24도시환경정비지구",
-    address: "서울특별시 마포구 도화동 16-1 일대",
-    district: "마포구",
-    project_type: "도시정비형 재개발",
-    current_status: "사업시행인가",
-    updated_at: new Date().toISOString(),
-    latitude: 37.5395,
-    longitude: 126.9471,
-  },
-};
-
-const MOCK_EVENTS = [
-  {
-    id: "e-1",
-    title: "마포로1-24도시환경정비지구 사업시행변경인가 공람공고",
-    event_type: "인가",
-    importance: 3,
-    occurred_at: "2024-03-15",
-    source_name: "서울시 도시계획 시행계획 공고 정보",
-    source_url: "https://data.seoul.go.kr",
-  },
-  {
-    id: "e-2",
-    title: "마포로1구역 도시정비형 재개발사업 정비계획 변경결정",
-    event_type: "계획변경",
-    importance: 2,
-    occurred_at: "2023-08-20",
-    source_name: "서울시 정비사업 정보몽땅",
-    source_url: "https://cleanup.seoul.go.kr",
-  },
-];
 
 async function fetchWithTimeout<T>(promise: Promise<T>, timeoutMs: number = 2000): Promise<T | null> {
   let timeoutHandle: any;
@@ -97,7 +63,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
     ]);
 
     const result = await fetchWithTimeout(dbCall, 1500);
-    if (result) {
+    if (result && result[0]?.data) {
       const [{ data: pData }, { data: eData }, { data: sData }] = result;
       project = pData;
       events = eData ?? [];
@@ -107,20 +73,35 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
     // Fallback
   }
 
-  // Fallback
+  // Exact Project Catalog Match
   if (!project) {
-    project = MOCK_PROJECTS[id] || {
-      id: id,
-      name: "마포로1-24도시환경정비지구",
-      address: "서울특별시 마포구 도화동 16-1 일대",
-      district: "마포구",
-      project_type: "도시정비형 재개발",
-      current_status: "사업시행인가",
-      updated_at: new Date().toISOString(),
-      latitude: 37.5395,
-      longitude: 126.9471,
-    };
-    events = MOCK_EVENTS;
+    const catalogItem = findProjectFromCatalog(id);
+    if (catalogItem) {
+      project = {
+        id: catalogItem.id,
+        name: catalogItem.name,
+        address: catalogItem.address,
+        district: catalogItem.district,
+        project_type: catalogItem.project_type,
+        current_status: catalogItem.current_status,
+        updated_at: catalogItem.updated_at,
+        latitude: catalogItem.latitude,
+        longitude: catalogItem.longitude,
+      };
+      events = catalogItem.events;
+    } else {
+      project = {
+        id: id,
+        name: "마포로1-24도시환경정비지구",
+        address: "서울특별시 마포구 도화동 16-1 일대",
+        district: "마포구",
+        project_type: "도시정비형 재개발",
+        current_status: "사업시행인가",
+        updated_at: new Date().toISOString(),
+        latitude: 37.5395,
+        longitude: 126.9471,
+      };
+    }
   }
 
   const pipeline = calculateStagePipeline(
