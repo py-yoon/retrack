@@ -22,6 +22,18 @@ const SeoulInteractiveMap = dynamic(
   }
 );
 
+const NaverMapView = dynamic(
+  () => import("@/components/NaverMapView"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center min-h-[520px] bg-[#f5f5f1] rounded-2xl text-xs text-[#777a76] animate-pulse border border-black/5">
+        🗺️ 네이버 지도를 불러오는 중입니다...
+      </div>
+    ),
+  }
+);
+
 const STAGE_FILTERS = [
   { label: "전체", value: "ALL" },
   { label: "🟢 관리처분·착공", value: "ADVANCED" },
@@ -82,6 +94,7 @@ function MapContent() {
   const [selectedStage, setSelectedStage] = useState("ALL");
   const [searchKeyword, setSearchKeyword] = useState("");
   const [selectedProject, setSelectedProject] = useState<MapProject | null>(null);
+  const [mapEngine, setMapEngine] = useState<"naver" | "tile">("naver");
   const [recentOnly, setRecentOnly] = useState(false);
 
   useEffect(() => {
@@ -201,6 +214,31 @@ function MapContent() {
           </div>
 
           <div className="flex items-center gap-2">
+            <div className="flex items-center rounded-xl bg-white border border-black/10 p-1 shadow-2xs">
+              <button
+                type="button"
+                onClick={() => setMapEngine("naver")}
+                className={`px-3 py-1 text-xs font-bold rounded-lg transition ${
+                  mapEngine === "naver"
+                    ? "bg-[#03c75a] text-white shadow-xs"
+                    : "text-[#666] hover:bg-black/5"
+                }`}
+              >
+                네이버 지도
+              </button>
+              <button
+                type="button"
+                onClick={() => setMapEngine("tile")}
+                className={`px-3 py-1 text-xs font-bold rounded-lg transition ${
+                  mapEngine === "tile"
+                    ? "bg-[#171918] text-white shadow-xs"
+                    : "text-[#666] hover:bg-black/5"
+                }`}
+              >
+                오픈 지도
+              </button>
+            </div>
+
             <label className="flex items-center gap-1.5 text-xs font-semibold text-[#171918] bg-white border border-black/10 px-3 py-1.5 rounded-xl cursor-pointer shadow-2xs">
               <input
                 type="checkbox"
@@ -270,12 +308,21 @@ function MapContent() {
       <div className="grid gap-6 lg:grid-cols-[1fr_340px] items-start">
         {/* Map View */}
         <div className="h-[550px] sm:h-[620px] w-full rounded-2xl overflow-hidden shadow-sm">
-          <SeoulInteractiveMap
-            projects={filteredProjects}
-            selectedProject={selectedProject}
-            onSelectProject={(p) => setSelectedProject(p)}
-            selectedDistrict={selectedDistrict}
-          />
+          {mapEngine === "naver" ? (
+            <NaverMapView
+              projects={filteredProjects}
+              selectedProject={selectedProject}
+              onSelectProject={(p) => setSelectedProject(p)}
+              selectedDistrict={selectedDistrict}
+            />
+          ) : (
+            <SeoulInteractiveMap
+              projects={filteredProjects}
+              selectedProject={selectedProject}
+              onSelectProject={(p) => setSelectedProject(p)}
+              selectedDistrict={selectedDistrict}
+            />
+          )}
         </div>
 
         {/* Selected Project Sidebar Card */}

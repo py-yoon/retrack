@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
+import Script from "next/script";
 import { getNaverMapUrl } from "@/lib/utils/map";
 import type { Coord } from "@/lib/data/project-polygons";
 
@@ -35,104 +34,97 @@ export default function ProjectDetailMap({
   center,
   polygon,
 }: ProjectDetailMapProps) {
-  const mapContainerRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<L.Map | null>(null);
-  const polygonLayerRef = useRef<L.Polygon | null>(null);
-  const cadastralLayerRef = useRef<L.TileLayer | null>(null);
-  const satelliteLayerRef = useRef<L.TileLayer | null>(null);
+  const mapElement = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<any>(null);
+  const polygonInstanceRef = useRef<any>(null);
+  const markerInstanceRef = useRef<any>(null);
+  const cadastralLayerRef = useRef<any>(null);
+  const infoWindowRef = useRef<any>(null);
 
+  const [isScriptReady, setIsScriptReady] = useState(false);
   const [isCadastralOn, setIsCadastralOn] = useState(false);
-  const [isSatelliteOn, setIsSatelliteOn] = useState(false);
+  const [mapType, setMapType] = useState<"normal" | "hybrid">("normal");
 
+  const clientId = process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID || "nbhyehsios";
   const stageColor = getStageColor(currentStatus);
   const naverUrl = getNaverMapUrl(district, address, projectName);
 
+  // Check if Naver Maps SDK already exists on window
   useEffect(() => {
-    if (!mapContainerRef.current) return;
-
-    // Destroy previous map instance if exists
-    if (mapInstanceRef.current) {
-      mapInstanceRef.current.remove();
-      mapInstanceRef.current = null;
+    if (typeof window !== "undefined" && (window as any).naver?.maps) {
+      setIsScriptReady(true);
     }
+  }, []);
 
-    // 1. Initialize Leaflet Map
-    const map = L.map(mapContainerRef.current, {
-      center: [center.lat, center.lng],
-      zoom: 16,
-      minZoom: 11,
-      maxZoom: 19,
-      zoomControl: false,
-    });
+  // Initialize Naver Map
+  useEffect(() => {
+    if (!isScriptReady || !mapElement.current) return;
+    const naver = (window as any).naver;
+    if (!naver?.maps) return;
 
-    L.control.zoom({ position: "topright" }).addTo(map);
+    try {
+      const centerLatLng = new naver.maps.LatLng(center.lat, center.lng);
 
-    // 2. Base Tile Layer (CartoDB Positron / OSM clean)
-    const baseLayer = L.tileLayer(
-      "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
-      {
-        attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
+      // 1. Initialize Map
+      const map = new naver.maps.Map(mapElement.current, {
+        center: centerLatLng,
+        zoom: 16,
+        minZoom: 11,
         maxZoom: 19,
+        zoomControl: true,
+        zoomControlOptions: {
+          position: naver.maps.Position.TOP_RIGHT,
+        },
+        mapTypeControl: false,
+      });
+
+      mapInstanceRef.current = map;
+
+      // 2. Render Verified Real Polygon (공공 실측 도면)
+      if (polygon && polygon.length >= 3) {
+        const paths = polygon.map((p) => new naver.maps.LatLng(p.lat, p.lng));
+
+        const naverPolygon = new naver.maps.Polygon({
+          map: map,
+          paths: paths,
+          fillColor: stageColor,
+          fillOpacity: 0.38,
+          strokeColor: stageColor,
+          strokeOpacity: 0.95,
+          strokeWeight: 3,
+          strokeLineJoin: "round",
+          clickable: true,
+        });
+
+        polygonInstanceRef.current = naverPolygon;
+
+        // Hover Effect
+        naver.maps.Event.addListener(naverPolygon, "mouseover", () => {
+          naverPolygon.setOptions({ fillOpacity: 0.65, strokeWeight: 4 });
+        });
+        naver.maps.Event.addListener(naverPolygon, "mouseout", () => {
+          naverPolygon.setOptions({ fillOpacity: 0.38, strokeWeight: 3 });
+        });
       }
-    ).addTo(map);
 
-    // 3. Render Polygon (구역 경계선)
-    if (polygon && polygon.length >= 3) {
-      const latlngs: [number, number][] = polygon.map((p) => [p.lat, p.lng]);
-      const poly = L.polygon(latlngs, {
-        color: stageColor,
-        weight: 3,
-        opacity: 0.95,
-        fillColor: stageColor,
-        fillOpacity: 0.38,
-        lineJoin: "round",
-      }).addTo(map);
-
-      poly.bindPopup(`
-        <div style="padding: 10px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-width: 180px;">
-          <div style="font-size: 11px; font-weight: 700; color: ${stageColor}; margin-bottom: 2px;">
-            ${currentStatus ?? "정비사업"} · ${projectType ?? "재개발"}
-          </div>
-          <div style="font-size: 14px; font-weight: 700; color: #171918;">
-            ${projectName}
-          </div>
-          <div style="font-size: 11px; color: #666; margin-top: 2px;">
-            ${district ?? ""} ${address ?? ""}
-          </div>
-          <div style="margin-top: 8px; padding-top: 6px; border-top: 1px solid #eee;">
-            <a href="${naverUrl}" target="_blank" style="font-size: 11px; font-weight: 700; color: #059669; text-decoration: none;">
-              네이버 지도 앱에서 열기 ↗
-            </a>
-          </div>
-        </div>
-      `);
-
-      polygonLayerRef.current = poly;
-
-      // Fit map bounds smoothly to polygon
-      map.fitBounds(poly.getBounds(), { padding: [30, 30], maxZoom: 17 });
-    }
-
-    // 4. Center Label Marker
-    const icon = L.divIcon({
-      className: "custom-retrack-marker",
-      html: `
+      // 3. Render Custom Center Marker
+      const markerContent = `
         <div style="transform: translate(-50%, -100%); cursor: pointer; text-align: center; white-space: nowrap;">
           <div style="
             background: #171918;
             color: #ffffff;
             font-size: 11px;
             font-weight: 700;
-            padding: 4px 8px;
-            border-radius: 6px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            padding: 5px 9px;
+            border-radius: 7px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.3);
             display: inline-flex;
             align-items: center;
-            gap: 4px;
-            border: 1px solid rgba(255,255,255,0.2);
+            gap: 5px;
+            border: 1px solid rgba(255,255,255,0.25);
           ">
             <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:${stageColor};"></span>
-            ${projectName}
+            <span>${projectName}</span>
           </div>
           <div style="
             width: 0; height: 0; 
@@ -142,94 +134,127 @@ export default function ProjectDetailMap({
             margin: 0 auto;
           "></div>
         </div>
-      `,
-      iconSize: [0, 0],
-    });
+      `;
 
-    const marker = L.marker([center.lat, center.lng], { icon }).addTo(map);
-    marker.on("click", () => {
-      if (polygonLayerRef.current) {
-        polygonLayerRef.current.openPopup();
+      const marker = new naver.maps.Marker({
+        position: centerLatLng,
+        map: map,
+        icon: {
+          content: markerContent,
+          anchor: new naver.maps.Point(0, 0),
+        },
+      });
+
+      markerInstanceRef.current = marker;
+
+      // 4. InfoWindow (팝업 창)
+      const infoContent = `
+        <div style="padding: 12px 14px; min-width: 210px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+          <div style="display: flex; items-center; gap: 5px; margin-bottom: 4px;">
+            <span style="font-size: 10px; font-weight: 700; color: #ffffff; background: ${stageColor}; padding: 2px 6px; border-radius: 4px;">
+              ${currentStatus ?? "진행단계"}
+            </span>
+            <span style="font-size: 10px; color: #777;">${projectType ?? "정비사업"}</span>
+          </div>
+          <div style="font-size: 13px; font-weight: 700; color: #171918; margin-top: 3px;">
+            ${projectName}
+          </div>
+          <div style="font-size: 11px; color: #666; margin-top: 2px;">
+            ${district ?? ""} ${address ?? ""}
+          </div>
+          <div style="margin-top: 8px; padding-top: 6px; border-top: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 10px; color: #059669; font-weight: 600;">
+              ${polygon && polygon.length >= 3 ? "✓ 실측 고시 도면 적용" : "위치 핀"}
+            </span>
+            <a href="${naverUrl}" target="_blank" rel="noreferrer" style="font-size: 11px; font-weight: 700; color: #059669; text-decoration: none;">
+              네이버 지도 앱 ↗
+            </a>
+          </div>
+        </div>
+      `;
+
+      const infoWindow = new naver.maps.InfoWindow({
+        content: infoContent,
+        backgroundColor: "#ffffff",
+        borderColor: "#e5e7eb",
+        borderWidth: 1,
+        disableAnchor: false,
+      });
+
+      infoWindowRef.current = infoWindow;
+
+      naver.maps.Event.addListener(marker, "click", () => {
+        infoWindow.open(map, marker);
+      });
+
+      if (polygonInstanceRef.current) {
+        naver.maps.Event.addListener(polygonInstanceRef.current, "click", () => {
+          infoWindow.open(map, marker);
+        });
       }
-    });
+    } catch (e) {
+      console.error("Naver Map init error:", e);
+    }
+  }, [isScriptReady, center, polygon, stageColor, currentStatus, projectName, district, address, projectType, naverUrl]);
 
-    mapInstanceRef.current = map;
-
-    return () => {
-      if (mapInstanceRef.current) {
-        mapInstanceRef.current.remove();
-        mapInstanceRef.current = null;
-      }
-    };
-  }, [center, polygon, stageColor, currentStatus, projectName, district, address, projectType, naverUrl]);
-
-  // Toggle Cadastral (Vworld 지적도)
+  // Toggle Naver Cadastral (네이버 순정 지적편집도)
   const toggleCadastral = () => {
+    const naver = (window as any).naver;
     const map = mapInstanceRef.current;
-    if (!map) return;
+    if (!naver?.maps || !map) return;
 
     if (!cadastralLayerRef.current) {
-      cadastralLayerRef.current = L.tileLayer(
-        "https://api.vworld.kr/req/wmts/1.0.0/CEB21B72-9E11-37E1-B5B3-7313627DFACF/Cadastral/{z}/{y}/{x}.png",
-        {
-          maxZoom: 19,
-          opacity: 0.65,
-          zIndex: 5,
-        }
-      );
+      cadastralLayerRef.current = new naver.maps.CadastralLayer();
     }
 
     if (isCadastralOn) {
-      map.removeLayer(cadastralLayerRef.current);
+      cadastralLayerRef.current.setMap(null);
       setIsCadastralOn(false);
     } else {
-      cadastralLayerRef.current.addTo(map);
+      cadastralLayerRef.current.setMap(map);
       setIsCadastralOn(true);
     }
   };
 
-  // Toggle Satellite (Vworld 위성사진)
-  const toggleSatellite = () => {
+  // Toggle Naver Satellite (네이버 순정 위성/하이브리드 지도)
+  const toggleMapType = () => {
+    const naver = (window as any).naver;
     const map = mapInstanceRef.current;
-    if (!map) return;
+    if (!naver?.maps || !map) return;
 
-    if (!satelliteLayerRef.current) {
-      satelliteLayerRef.current = L.tileLayer(
-        "https://api.vworld.kr/req/wmts/1.0.0/CEB21B72-9E11-37E1-B5B3-7313627DFACF/Satellite/{z}/{y}/{x}.jpeg",
-        {
-          maxZoom: 19,
-          zIndex: 1,
-        }
-      );
-    }
-
-    if (isSatelliteOn) {
-      map.removeLayer(satelliteLayerRef.current);
-      setIsSatelliteOn(false);
+    if (mapType === "normal") {
+      map.setMapTypeId(naver.maps.MapTypeId.HYBRID);
+      setMapType("hybrid");
     } else {
-      satelliteLayerRef.current.addTo(map);
-      setIsSatelliteOn(true);
+      map.setMapTypeId(naver.maps.MapTypeId.NORMAL);
+      setMapType("normal");
     }
   };
 
   // Reset Center
   const handleResetCenter = () => {
+    const naver = (window as any).naver;
     const map = mapInstanceRef.current;
-    if (!map) return;
-    if (polygonLayerRef.current) {
-      map.fitBounds(polygonLayerRef.current.getBounds(), { padding: [30, 30], maxZoom: 17 });
-    } else {
-      map.setView([center.lat, center.lng], 16);
-    }
+    if (!naver?.maps || !map) return;
+
+    map.panTo(new naver.maps.LatLng(center.lat, center.lng));
+    map.setZoom(16);
   };
 
   return (
     <div className="relative w-full rounded-2xl overflow-hidden border border-black/10 bg-[#f7f7f4] shadow-sm">
-      {/* Map Container */}
-      <div ref={mapContainerRef} className="w-full h-[380px] sm:h-[430px] z-0" />
+      {/* Naver Maps Open API Script */}
+      <Script
+        src={`https://oapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${clientId}&submodules=geocoder`}
+        strategy="afterInteractive"
+        onLoad={() => setIsScriptReady(true)}
+      />
+
+      {/* Map Element */}
+      <div ref={mapElement} className="w-full h-[380px] sm:h-[430px] z-0" />
 
       {/* Top Map Controls Overlay */}
-      <div className="absolute top-3 left-3 z-[1000] flex flex-wrap items-center gap-2 pointer-events-auto">
+      <div className="absolute top-3 left-3 z-[100] flex flex-wrap items-center gap-2 pointer-events-auto">
         <div className="flex items-center gap-1.5 bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-xl border border-black/10 shadow-xs text-xs font-semibold text-[#171918]">
           <span
             className="w-2.5 h-2.5 rounded-full inline-block"
@@ -247,19 +272,19 @@ export default function ProjectDetailMap({
               : "bg-white/95 border-black/10 text-[#171918] hover:bg-black/5"
           }`}
         >
-          {isCadastralOn ? "✓ 지적편집도 ON" : "지적편집도"}
+          {isCadastralOn ? "✓ 네이버 지적편집도 ON" : "지적편집도"}
         </button>
 
         <button
           type="button"
-          onClick={toggleSatellite}
+          onClick={toggleMapType}
           className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition shadow-xs cursor-pointer ${
-            isSatelliteOn
+            mapType === "hybrid"
               ? "bg-blue-600 border-blue-700 text-white"
               : "bg-white/95 border-black/10 text-[#171918] hover:bg-black/5"
           }`}
         >
-          {isSatelliteOn ? "일반지도 전환" : "위성지도"}
+          {mapType === "hybrid" ? "일반지도" : "위성지도"}
         </button>
 
         <button
@@ -273,7 +298,7 @@ export default function ProjectDetailMap({
       </div>
 
       {/* Bottom Info Bar */}
-      <div className="absolute bottom-3 left-3 right-3 z-[1000] flex items-center justify-between pointer-events-auto bg-white/95 backdrop-blur-md px-4 py-2.5 rounded-xl border border-black/10 shadow-sm text-xs">
+      <div className="absolute bottom-3 left-3 right-3 z-[100] flex items-center justify-between pointer-events-auto bg-white/95 backdrop-blur-md px-4 py-2.5 rounded-xl border border-black/10 shadow-sm text-xs">
         <div className="flex items-center gap-2 truncate">
           <span className="font-semibold text-[#171918] truncate">{projectName}</span>
           <span className="text-[#777a76] hidden sm:inline truncate">{address ?? district}</span>
