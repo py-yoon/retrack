@@ -38,6 +38,9 @@ yarn-error.log*
 *.sql
 /tmp/
 
+# raw source snapshots (re-downloaded manually, not redistributed)
+/data/
+
 # vercel
 .vercel
 

@@ -11,15 +11,18 @@
     "data:events": "node --env-file=.env.local scripts/build-seoul-events-import.mjs",
     "data:stages": "node --env-file=.env.local scripts/build-cleanup-stages-import.mjs",
     "data:audit": "node --env-file=.env.local scripts/audit-matching.mjs",
-    "data:sync": "node --env-file=.env.local scripts/sync-all.mjs"
+    "data:sync": "node --env-file=.env.local scripts/sync-all.mjs",
+    "data:polygons": "node scripts/fetch-real-polygons.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.3",
     "@types/leaflet": "^1.9.22",
     "leaflet": "^1.9.4",
     "next": "^16.2.12",
+    "proj4": "^2.21.0",
     "react": "^19.2.4",
-    "react-dom": "^19.2.4"
+    "react-dom": "^19.2.4",
+    "shapefile": "^0.6.6"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
