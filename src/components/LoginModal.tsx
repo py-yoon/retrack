@@ -4,9 +4,8 @@ import React, { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth/auth-context";
 
 export default function LoginModal() {
-  const { isLoginModalOpen, closeLoginModal, signInWithKakao, signInWithGoogle, signInAsDemoUser, loginRedirectUrl, kakaoLoginError } = useAuth();
+  const { isLoginModalOpen, closeLoginModal, signInWithKakao, signInWithGoogle, signInAsDemoUser, loginRedirectUrl } = useAuth();
   const [error, setError] = useState<string | null>(null);
-  const displayedError = error ?? kakaoLoginError;
 
   const handleKakaoLogin = () => {
     setError(null);
@@ -69,8 +68,8 @@ export default function LoginModal() {
             </svg>
             카카오로 3초 만에 시작하기
           </button>
-          {displayedError && (
-            <p className="rounded-xl bg-red-50 px-3 py-2 text-xs font-medium text-red-700">{displayedError}</p>
+          {error && (
+            <p className="rounded-xl bg-red-50 px-3 py-2 text-xs font-medium text-red-700">{error}</p>
           )}
 
           {/* Google Login Button */}

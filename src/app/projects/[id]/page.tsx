@@ -10,7 +10,7 @@ import ProjectRiskRadar from "@/components/ProjectRiskRadar";
 import ProjectPdfReportButton from "@/components/ProjectPdfReportButton";
 import MembershipEligibilityCard from "@/components/MembershipEligibilityCard";
 import DistrictParcelsViewer from "@/components/DistrictParcelsViewer";
-import { getSupabaseClient } from "@/lib/supabase/client";
+import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { calculateStagePipeline } from "@/lib/utils/stages";
 import { getNaverMapUrl } from "@/lib/utils/map";
 import { getProjectCoordinates } from "@/lib/utils/coordinates";
@@ -70,7 +70,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
   } else {
     // 2. Supabase DB Lookup
     try {
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseServerClient();
       const dbCall = Promise.all([
         supabase
           .from("projects")
