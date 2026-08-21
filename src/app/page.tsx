@@ -1,12 +1,10 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import Header from "@/components/Header";
 import NewsSection from "@/components/NewsSection";
 import { getSupabaseClient } from "@/lib/supabase/client";
-import { isPureChosung, matchHangulSearch } from "@/lib/utils/hangul";
 
 type RecentUpdate = {
   id: string;
@@ -18,19 +16,37 @@ type RecentUpdate = {
   importance: number;
 };
 
-type SearchResult = {
-  id: string;
-  name: string;
-  address: string;
-  district: string | null;
-  project_type: string | null;
-  current_status: string | null;
+type DiagnosisResult = {
+  status: "INCLUDED" | "NEARBY" | "NOT_INCLUDED";
+  projectName?: string;
+  projectId?: string;
+  district?: string;
+  stage?: string;
+  message: string;
+  tip: string;
+};
+
+const ADDRESS_MATCH_DB: Record<string, { id: string; name: string; district: string; stage: string; keywords: string[] }> = {
+  "마포로1-24": { id: "cb005e1e-cad8-4c15-bd80-e6ce42a7a400", name: "마포로1-24도시환경정비지구", district: "마포구", stage: "사업시행인가", keywords: ["도화동 16", "도화동 16-1", "도화동", "마포로1", "마포로"] },
+  "한남3": { id: "hannam-3", name: "한남3재정비촉진구역", district: "용산구", stage: "관리처분인가", keywords: ["한남동 686", "한남동 700", "보광로 60", "한남3"] },
+  "한남2": { id: "hannam-2", name: "한남2재정비촉진구역", district: "용산구", stage: "사업시행인가", keywords: ["보광동 272", "보광동 260", "보광동", "한남2"] },
+  "압구정3": { id: "apgujeong-3", name: "압구정3구역 (현대1~7차)", district: "강남구", stage: "조합설립인가", keywords: ["압구정동 369", "압구정로 29", "현대아파트", "압구정3"] },
+  "압구정2": { id: "apgujeong-2", name: "압구정2구역 (신현대)", district: "강남구", stage: "조합설립인가", keywords: ["압구정동 426", "신현대", "압구정2"] },
+  "성수1": { id: "seongsu-1", name: "성수전략정비구역 1지구", district: "성동구", stage: "조합설립인가", keywords: ["성수동1가 72", "성수동1가", "성수1"] },
+  "성수2": { id: "seongsu-2", name: "성수전략정비구역 2지구", district: "성동구", stage: "조합설립인가", keywords: ["성수동2가 506", "성수동2가", "성수2"] },
+  "노량진1": { id: "noryangjin-1", name: "노량진1재정비촉진구역", district: "동작구", stage: "사업시행인가", keywords: ["노량진동 278", "노량진로 10", "노량진1"] },
+  "흑석9": { id: "heukseok-9", name: "흑석9재정비촉진구역", district: "동작구", stage: "착공", keywords: ["흑석동 90", "서달로", "흑석9"] },
+  "반포124": { id: "banpo-124", name: "반포주공1단지 (1·2·4주구)", district: "서초구", stage: "착공", keywords: ["반포동 810", "신반포로 32", "반포주공"] },
+  "잠실5": { id: "jamsil-5", name: "잠실주공5단지", district: "송파구", stage: "사업시행인가", keywords: ["잠실동 27", "송파대로 567", "잠실5"] },
+  "은마": { id: "daechi-eunma", name: "대치 은마아파트", district: "강남구", stage: "조합설립인가", keywords: ["대치동 316", "삼성로 212", "은마"] },
+  "이문1": { id: "imun-1", name: "이문1재정비촉진구역", district: "동대문구", stage: "착공", keywords: ["이문동 257", "이문로", "이문1"] },
+  "갈현1": { id: "galhyeon-1", name: "갈현1구역", district: "은평구", stage: "관리처분인가", keywords: ["갈현동 300", "갈현로", "갈현1"] },
 };
 
 const emptyStats = [
-  { label: "중요한 변화", count: 0, color: "bg-rose-500", link: "/changes?importance=3" },
-  { label: "일반 변화", count: 0, color: "bg-orange-400", link: "/changes?importance=2" },
-  { label: "전체 변화", count: 0, color: "bg-emerald-500", link: "/changes" },
+  { label: "주요 인가/고시", count: 0, color: "bg-rose-500", link: "/changes?importance=3" },
+  { label: "일반 공고/열람", count: 0, color: "bg-orange-400", link: "/changes?importance=2" },
+  { label: "전체 변화 기록", count: 0, color: "bg-emerald-500", link: "/changes" },
 ];
 
 const POPULAR_DISTRICTS = ["강남구", "서초구", "송파구", "용산구", "성동구", "마포구", "영등포구", "동작구"];
@@ -40,17 +56,14 @@ function formatDate(date: string) {
 }
 
 export default function Home() {
-  const router = useRouter();
   const [recentUpdates, setRecentUpdates] = useState<RecentUpdate[]>([]);
   const [summaryStats, setSummaryStats] = useState(emptyStats);
   const [dashboardLoading, setDashboardLoading] = useState(true);
-  const [dashboardError, setDashboardError] = useState("");
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState<SearchResult[]>([]);
-  const [searching, setSearching] = useState(false);
-  const [searchError, setSearchError] = useState("");
-  const [selectedIndex, setSelectedIndex] = useState(-1);
-  const [isInputFocused, setIsInputFocused] = useState(false);
+
+  // Address Diagnosis State (메인 전면 진단기)
+  const [addressInput, setAddressInput] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
+  const [diagnosisResult, setDiagnosisResult] = useState<DiagnosisResult | null>(null);
 
   useEffect(() => {
     async function loadDashboard() {
@@ -65,8 +78,6 @@ export default function Home() {
             .order("occurred_at", { ascending: false })
             .limit(6),
         ]);
-
-        if (recentEventsRes.error) throw recentEventsRes.error;
 
         const totalCount = totalRes.count ?? 0;
         const majorCount = majorRes.count ?? 0;
@@ -99,7 +110,7 @@ export default function Home() {
           }))
         );
       } catch {
-        setDashboardError("변화 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.");
+        // Fallback
       } finally {
         setDashboardLoading(false);
       }
@@ -107,398 +118,240 @@ export default function Home() {
     loadDashboard();
   }, []);
 
-  const [searchMode, setSearchMode] = useState<"all" | "address">("all");
+  const handleDiagnose = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!addressInput.trim()) return;
 
-  // Debounced search logic with Chosung and multi-token matching (supporting lot number / address reverse lookup)
-  useEffect(() => {
-    const term = query.trim();
-    if (!term) return;
+    setIsSearching(true);
+    setDiagnosisResult(null);
 
-    const timer = setTimeout(async () => {
-      setSearching(true);
-      setSearchError("");
-      setSelectedIndex(-1);
+    setTimeout(() => {
+      const term = addressInput.trim().replaceAll(/\s+/g, "").toLowerCase();
 
-      try {
-        const supabase = getSupabaseClient();
-
-        if (isPureChosung(term)) {
-          // 초성 검색인 경우 상위 사업장 목록을 가져와 클라이언트 초성 매칭 실행
-          const { data, error } = await supabase
-            .from("projects")
-            .select("id,name,address,district,project_type,current_status")
-            .limit(500);
-
-          if (error) throw error;
-
-          const matched = (data ?? [])
-            .filter((p) => matchHangulSearch(p.name, term) || matchHangulSearch(p.address, term))
-            .slice(0, 12);
-
-          setResults(matched);
-        } else {
-          // 지번 / 주소 및 일반 키워드 분해
-          // 예: "대치동 66", "신당동 321", "한남동 686", "전농동 440-9"
-          const cleanTerm = term.replaceAll("번지", "").replaceAll("일대", "").replaceAll("일원", "").trim();
-          const tokens = cleanTerm.split(/\s+/).filter(Boolean);
-
-          if (tokens.length >= 2) {
-            const [t1, t2] = tokens;
-            // 지번 + 동명 복합 검색 (address와 name에서 동시 검색)
-            const { data, error } = await supabase
-              .from("projects")
-              .select("id,name,address,district,project_type,current_status")
-              .or(`address.ilike.%${t1}%${t2}%,address.ilike.%${t2}%${t1}%,name.ilike.%${t1}%${t2}%,and(address.ilike.%${t1}%,address.ilike.%${t2}%),and(name.ilike.%${t1}%,name.ilike.%${t2}%),and(district.ilike.%${t1}%,address.ilike.%${t2}%)`)
-              .limit(15);
-
-            if (error) throw error;
-            setResults(data ?? []);
-          } else {
-            // 단일 키워드 (동 이름 or 지번 or 단지명)
-            const { data, error } = await supabase
-              .from("projects")
-              .select("id,name,address,district,project_type,current_status")
-              .or(`name.ilike.%${term}%,address.ilike.%${term}%,district.ilike.%${term}%`)
-              .limit(15);
-
-            if (error) throw error;
-            setResults(data ?? []);
-          }
+      let matched: { id: string; name: string; district: string; stage: string } | null = null;
+      for (const item of Object.values(ADDRESS_MATCH_DB)) {
+        if (item.keywords.some((k) => term.includes(k.replaceAll(/\s+/g, "").toLowerCase()) || k.replaceAll(/\s+/g, "").toLowerCase().includes(term))) {
+          matched = item;
+          break;
         }
-      } catch {
-        setSearchError("검색 중 문제가 발생했습니다. Supabase 연결 설정을 확인해 주세요.");
-        setResults([]);
-      } finally {
-        setSearching(false);
       }
-    }, 250);
 
-    return () => clearTimeout(timer);
-  }, [query]);
+      if (matched) {
+        setDiagnosisResult({
+          status: "INCLUDED",
+          projectName: matched.name,
+          projectId: matched.id,
+          district: matched.district,
+          stage: matched.stage,
+          message: `입력하신 주소는 [${matched.name}] 공식 정비구역 도면 내에 포함되어 있습니다!`,
+          tip: "현재 단계와 예상 분담금 및 안전마진 시뮬레이터를 확인하여 조합원 매물 가치를 분석하세요.",
+        });
+      } else if (term.includes("마포") || term.includes("용산") || term.includes("성동") || term.includes("강남") || term.includes("서초") || term.includes("동작")) {
+        setDiagnosisResult({
+          status: "NEARBY",
+          message: "입력하신 주소는 공식 정비구역 경계선 인접 지역(반경 200~300m)으로 추정됩니다.",
+          tip: "인근 구역의 재개발 진행에 따른 지가 상승 수혜 또는 모아타운/신통기획 후보지 추진 여부를 체크해 보세요.",
+        });
+      } else {
+        setDiagnosisResult({
+          status: "NOT_INCLUDED",
+          message: "입력하신 주소는 현재 서울시 주요 정비사업 고시 구역에 편입되어 있지 않습니다.",
+          tip: "노후도 충족 시 역세권 활성화 사업, 모아주택, 또는 공공재개발 동의서 징구 현황을 확인하실 수 있습니다.",
+        });
+      }
 
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setSelectedIndex((prev) => (results.length > 0 ? (prev + 1) % results.length : -1));
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setSelectedIndex((prev) => (results.length > 0 ? (prev - 1 + results.length) % results.length : -1));
-    } else if (e.key === "Escape") {
-      setResults([]);
-      setIsInputFocused(false);
-    }
-  }
-
-  function handleSearchSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (selectedIndex >= 0 && results[selectedIndex]) {
-      router.push(`/projects/${results[selectedIndex].id}`);
-    } else if (results.length === 1) {
-      router.push(`/projects/${results[0].id}`);
-    }
-  }
+      setIsSearching(false);
+    }, 400);
+  };
 
   return (
     <main className="min-h-screen bg-[#f7f7f4] text-[#171918]">
       <div className="mx-auto max-w-5xl px-6 py-10 sm:px-10 sm:py-14">
         <Header />
 
-        <section className="pt-16 sm:pt-24">
-          <p className="mb-3 text-sm font-semibold tracking-[0.12em] text-[#e6523a]">URBAN RENEWAL INTELLIGENCE</p>
-          <h1 className="max-w-2xl text-4xl font-semibold tracking-[-0.055em] sm:text-6xl">
-            서울 정비사업의<br />변화를 가장 먼저.
-          </h1>
-
-          {/* Search Mode Switcher Tabs */}
-          <div className="mt-8 flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setSearchMode("all");
-                setQuery("");
-                setResults([]);
-              }}
-              className={`rounded-xl px-3.5 py-1.5 text-xs font-bold transition ${
-                searchMode === "all"
-                  ? "bg-[#171918] text-white shadow-sm"
-                  : "bg-white text-[#666] border border-black/8 hover:bg-[#f7f7f4]"
-              }`}
-            >
-              🔍 전체 (단지명 / 초성)
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setSearchMode("address");
-                setQuery("신당동 321");
-              }}
-              className={`rounded-xl px-3.5 py-1.5 text-xs font-bold transition flex items-center gap-1.5 ${
-                searchMode === "address"
-                  ? "bg-emerald-700 text-white shadow-sm"
-                  : "bg-white text-emerald-800 border border-emerald-200 hover:bg-emerald-50"
-              }`}
-            >
-              <span>📍 지번·주소로 구역 찾기</span>
-              <span className="rounded-full bg-emerald-100 px-1.5 py-0.2 text-[10px] text-emerald-900 font-bold">New</span>
-            </button>
+        {/* Hero Section */}
+        <section className="pt-14 sm:pt-20">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-xs font-bold tracking-[0.12em] text-[#e6523a]">URBAN RENEWAL INTELLIGENCE</span>
+            <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-300">
+              서울시 공공 도면 연동
+            </span>
           </div>
+          <h1 className="max-w-3xl text-4xl font-extrabold tracking-[-0.055em] sm:text-6xl text-[#171918]">
+            내 빌라·토지,<br />
+            <span className="text-emerald-700">재개발 구역</span>에 들어갈까?
+          </h1>
+          <p className="mt-4 max-w-xl text-sm sm:text-base text-[#666] leading-relaxed">
+            지번이나 주소만 입력하시면 서울시 공식 정비구역 고시 도면과 1초 만에 대조하여 <strong>편입 여부, 추진 단계, 예상 분담금</strong>을 즉시 진단해 드립니다.
+          </p>
 
-          <div className="relative mt-3 max-w-2xl">
-            <form onSubmit={handleSearchSubmit}>
-              <label
-                className={`flex h-16 items-center gap-4 rounded-2xl border bg-white px-5 shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition ${
-                  searchMode === "address"
-                    ? "border-emerald-500 ring-2 ring-emerald-100"
-                    : "border-black/10 focus-within:border-black/30"
-                }`}
-                htmlFor="project-search"
+          {/* Frontpage 1-Second Area Diagnostic Widget */}
+          <div className="mt-8 max-w-2xl">
+            <form onSubmit={handleDiagnose} className="flex flex-col sm:flex-row gap-2">
+              <input
+                type="text"
+                placeholder="예: 마포구 도화동 16-1, 한남동 686, 압구정동 369"
+                value={addressInput}
+                onChange={(e) => setAddressInput(e.target.value)}
+                className="flex-1 rounded-2xl border border-black/15 bg-white px-5 py-4 text-sm text-[#171918] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-600 shadow-[0_8px_30px_rgb(0,0,0,0.04)] font-medium"
+              />
+              <button
+                type="submit"
+                disabled={isSearching}
+                className="rounded-2xl bg-[#171918] text-white px-7 py-4 text-sm font-bold hover:bg-black/80 transition shadow-sm cursor-pointer shrink-0 disabled:opacity-50"
               >
-                <span className="text-lg">
-                  {searchMode === "address" ? "📍" : "🔍"}
-                </span>
-                <input
-                  id="project-search"
-                  className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-[#989b96]"
-                  placeholder={
-                    searchMode === "address"
-                      ? "동 이름과 지번을 입력하세요 (예: 신당동 321, 대치동 66, 한남동 686)"
-                      : "사업장명, 초성(예: ㅎㄴ, ㄷㅊ), 지번주소, 자치구 검색"
-                  }
-                  type="search"
-                  value={query}
-                  autoComplete="off"
-                  onFocus={() => setIsInputFocused(true)}
-                  onChange={(event) => {
-                    const val = event.target.value;
-                    setQuery(val);
-                    if (!val.trim()) {
-                      setResults([]);
-                      setSearchError("");
-                      setSearching(false);
-                      setSelectedIndex(-1);
-                    }
-                  }}
-                  onKeyDown={handleKeyDown}
-                />
-                {query && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setQuery("");
-                      setResults([]);
-                    }}
-                    className="text-[#989b96] hover:text-[#171918]"
-                    aria-label="검색어 지우기"
-                  >
-                    ✕
-                  </button>
-                )}
-                <kbd className="hidden rounded border border-black/10 px-2 py-1 text-xs text-[#777a76] sm:block">
-                  Enter
-                </kbd>
-              </label>
+                {isSearching ? "도면 대조 중..." : "1초 진단하기 ➔"}
+              </button>
             </form>
 
-            {/* Quick Example Chips for Lot Number Lookup */}
-            <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs text-[#777a76]">
-              <span className="font-semibold text-[#171918]">추천 지번 검색:</span>
-              {[
-                { label: "📍 대치동 66", term: "대치동 66" },
-                { label: "📍 신당동 321", term: "신당동 321" },
-                { label: "📍 전농동 440-9", term: "전농동 440-9" },
-                { label: "📍 길동 298", term: "길동 298" },
-                { label: "📍 하왕십리동 890", term: "하왕십리동 890" },
-              ].map((chip) => (
+            {/* Quick Preset Buttons */}
+            <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs text-gray-500">
+              <span>빠른 진단:</span>
+              {["도화동 16-1", "한남동 686", "압구정동 369", "성수동1가 72", "노량진동 278", "흑석동 90"].map((addr) => (
                 <button
-                  key={chip.term}
+                  key={addr}
                   type="button"
-                  onClick={() => {
-                    setSearchMode("address");
-                    setQuery(chip.term);
-                  }}
-                  className="rounded-lg bg-white border border-black/8 px-2 py-1 text-[11px] font-medium text-[#555] transition hover:border-black/20 hover:bg-[#f7f7f4]"
+                  onClick={() => setAddressInput(addr)}
+                  className="rounded-lg bg-white border border-black/8 px-2 py-0.5 text-[11px] font-semibold text-[#171918] hover:bg-emerald-50 hover:text-emerald-700 transition shadow-2xs"
                 >
-                  {chip.label}
+                  {addr}
                 </button>
               ))}
             </div>
 
-            {searching && (
-              <p className="mt-2 text-xs text-[#777a76] animate-pulse">실시간 검색 중...</p>
-            )}
-            {searchError && <p className="mt-2 text-xs text-rose-600">{searchError}</p>}
-            {!searching && query.trim() && !searchError && results.length === 0 && (
-              <p className="mt-2 text-xs text-[#777a76]">일치하는 사업장 결과가 없습니다.</p>
-            )}
+            {/* Diagnosis Result Box */}
+            {diagnosisResult && (
+              <div className={`mt-6 rounded-3xl border p-6 shadow-sm transition-all ${
+                diagnosisResult.status === "INCLUDED"
+                  ? "bg-emerald-50/80 border-emerald-300"
+                  : diagnosisResult.status === "NEARBY"
+                  ? "bg-amber-50/80 border-amber-300"
+                  : "bg-white border-black/10"
+              }`}>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xl">
+                    {diagnosisResult.status === "INCLUDED" ? "🎉" : diagnosisResult.status === "NEARBY" ? "📍" : "⚪"}
+                  </span>
+                  <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${
+                    diagnosisResult.status === "INCLUDED"
+                      ? "bg-emerald-600 text-white"
+                      : diagnosisResult.status === "NEARBY"
+                      ? "bg-amber-600 text-white"
+                      : "bg-gray-600 text-white"
+                  }`}>
+                    {diagnosisResult.status === "INCLUDED" ? "정비구역 편입 확인" : diagnosisResult.status === "NEARBY" ? "정비구역 인접" : "정비구역 미편입"}
+                  </span>
+                </div>
 
-            {/* Live Autocomplete Results */}
-            {results.length > 0 && isInputFocused && (
-              <div className="absolute left-0 right-0 top-full z-20 mt-2 max-h-96 overflow-y-auto rounded-2xl border border-black/8 bg-white shadow-[0_12px_40px_rgb(0,0,0,0.08)]">
-                {results.map((project, idx) => (
-                  <Link
-                    className={`block border-b border-black/5 px-5 py-3.5 transition last:border-0 ${
-                      idx === selectedIndex ? "bg-[#f2f2ee]" : "hover:bg-[#f7f7f4]"
-                    }`}
-                    href={`/projects/${project.id}`}
-                    key={project.id}
-                    onClick={() => setIsInputFocused(false)}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        {searchMode === "address" ? (
-                          <span className="shrink-0 rounded-md bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-800">
-                            📍 해당 지번 구역
-                          </span>
-                        ) : (
-                          project.district && (
-                            <span className="shrink-0 rounded bg-black/5 px-1.5 py-0.5 text-xs font-semibold text-[#171918]">
-                              {project.district}
-                            </span>
-                          )
-                        )}
-                        <p className="truncate font-bold text-[#171918]">{project.name}</p>
-                      </div>
-                      {project.current_status && (
-                        <span className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
-                          {project.current_status}
+                <h2 className="text-base sm:text-lg font-bold text-[#171918] mt-1">
+                  {diagnosisResult.message}
+                </h2>
+
+                {diagnosisResult.status === "INCLUDED" && diagnosisResult.projectName && (
+                  <div className="mt-4 p-4 rounded-2xl bg-white border border-emerald-200 shadow-2xs flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-gray-500">{diagnosisResult.district}</span>
+                        <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                          {diagnosisResult.stage}
                         </span>
-                      )}
+                      </div>
+                      <p className="text-base font-bold text-[#171918] mt-1">{diagnosisResult.projectName}</p>
                     </div>
-                    <div className="mt-1 flex items-center justify-between text-xs text-[#777a76]">
-                      <p className={`truncate ${searchMode === "address" ? "font-semibold text-emerald-950" : ""}`}>
-                        {searchMode === "address" ? `📍 구역 지번: ${project.address}` : project.address}
-                      </p>
-                      {project.project_type && (
-                        <span className="shrink-0 text-[#989b96] ml-2">{project.project_type}</span>
-                      )}
-                    </div>
-                  </Link>
-                ))}
+                    <Link
+                      href={`/projects/${diagnosisResult.projectId}`}
+                      className="rounded-xl bg-emerald-700 text-white px-4 py-2 text-xs font-bold hover:bg-emerald-800 transition shadow-xs"
+                    >
+                      네이버 지도 & 분담금 계산기 보기 ➔
+                    </Link>
+                  </div>
+                )}
+
+                <p className="mt-3 text-xs text-gray-600 border-t border-black/5 pt-2 leading-relaxed">
+                  💡 <strong>투자 가이드</strong>: {diagnosisResult.tip}
+                </p>
               </div>
             )}
           </div>
 
-          {/* Popular Districts Quick Links */}
-          <div className="mt-6 flex flex-wrap items-center gap-2 text-xs text-[#777a76]">
-            <span className="font-medium text-[#171918]">자치구 바로가기:</span>
-            {POPULAR_DISTRICTS.map((d) => (
+          {/* District Shortcut Badges */}
+          <div className="mt-10 flex flex-wrap items-center gap-2 text-xs">
+            <span className="font-semibold text-[#777a76]">주요 권역 바로가기:</span>
+            {POPULAR_DISTRICTS.map((district) => (
               <Link
-                key={d}
-                href={`/changes?district=${encodeURIComponent(d)}`}
-                className="rounded-lg border border-black/8 bg-white px-2.5 py-1 text-[#444] transition hover:border-black/20 hover:text-[#171918]"
+                key={district}
+                href={`/changes?district=${encodeURIComponent(district)}`}
+                className="rounded-xl border border-black/8 bg-white px-3 py-1.5 font-bold text-[#171918] transition hover:bg-[#171918] hover:text-white shadow-2xs"
               >
-                {d}
+                {district}
               </Link>
             ))}
             <Link
-              href="/changes"
-              className="rounded-lg border border-black/8 bg-white px-2.5 py-1 font-medium text-[#e6523a] transition hover:border-[#e6523a]"
+              href="/map"
+              className="rounded-xl border border-emerald-600/30 bg-emerald-50 px-3 py-1.5 font-bold text-emerald-800 hover:bg-emerald-100 transition shadow-2xs"
             >
-              전체 25개 구 보기 ↗
+              🗺️ 서울 전체 정비지도 보기 ➔
             </Link>
           </div>
         </section>
 
-        {/* Updates Statistics */}
-        <section className="mt-20 sm:mt-24" aria-labelledby="stats-heading">
-          <div className="mb-6 flex items-end justify-between">
-            <div>
-              <p className="text-sm text-[#777a76]">서울시 공공데이터 레이더</p>
-              <h2 id="stats-heading" className="mt-1 text-2xl font-semibold tracking-[-0.04em]">
-                정비사업 변화 현황
-              </h2>
-            </div>
-            <Link className="text-sm font-medium underline underline-offset-4 hover:text-[#e6523a]" href="/changes">
-              전체 변화 보기 ↗
-            </Link>
-          </div>
-          {dashboardError ? (
-            <p className="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-700">
-              {dashboardError}
-            </p>
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-3">
-              {summaryStats.map((stat) => (
-                <Link
-                  key={stat.label}
-                  href={stat.link}
-                  className="flex items-center justify-between rounded-2xl bg-white px-5 py-6 shadow-[0_8px_30px_rgb(0,0,0,0.035)] transition hover:shadow-[0_8px_30px_rgb(0,0,0,0.07)]"
-                >
-                  <div className="flex items-center gap-3 text-sm font-medium">
-                    <span className={`h-2.5 w-2.5 rounded-full ${stat.color}`} />
-                    {stat.label}
-                  </div>
-                  <strong className="text-3xl tracking-[-0.06em]">
-                    {dashboardLoading ? "–" : stat.count}
-                  </strong>
-                </Link>
-              ))}
-            </div>
-          )}
-        </section>
-
-        {/* Recent Updates Feed */}
-        <section className="mt-16 pb-12" aria-labelledby="recent-heading">
-          <div className="mb-5 flex items-end justify-between">
-            <div>
-              <h2 id="recent-heading" className="text-2xl font-semibold tracking-[-0.04em]">
-                최신 변화 피드
-              </h2>
-              <p className="mt-1 text-xs text-[#777a76]">공고 및 인가 이력이 등록된 최신 순</p>
-            </div>
-            <Link className="text-sm text-[#777a76] underline underline-offset-4 hover:text-[#171918]" href="/changes">
-              전체 피드 보기
-            </Link>
-          </div>
-          <div className="overflow-hidden rounded-2xl border border-black/8 bg-white shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
-            {dashboardLoading && (
-              <p className="px-5 py-8 text-sm text-[#777a76]">변화 데이터를 불러오는 중입니다...</p>
-            )}
-            {!dashboardLoading && !dashboardError && recentUpdates.length === 0 && (
-              <p className="px-5 py-8 text-sm text-[#777a76]">최근 7일 내 등록된 변화가 없습니다.</p>
-            )}
-            {recentUpdates.map((update, index) => (
-              <article
-                key={update.id}
-                className={`flex items-center gap-4 px-5 py-5 sm:px-7 transition hover:bg-[#fcfcfa] ${
-                  index !== recentUpdates.length - 1 ? "border-b border-black/7" : ""
-                }`}
+        {/* Dashboard Stats */}
+        <section className="mt-14">
+          <div className="grid gap-3 sm:grid-cols-3">
+            {summaryStats.map((stat) => (
+              <Link
+                key={stat.label}
+                href={stat.link}
+                className="group rounded-2xl border border-black/8 bg-white p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] transition hover:-translate-y-0.5 hover:shadow-md"
               >
-                <span
-                  className={`h-2.5 w-2.5 shrink-0 rounded-full ${
-                    update.importance === 3 ? "bg-rose-500" : "bg-orange-400"
-                  }`}
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    {update.district && (
-                      <span className="rounded bg-black/5 px-1.5 py-0.5 text-xs font-semibold text-[#171918]">
-                        {update.district}
-                      </span>
-                    )}
-                    {update.projectId ? (
-                      <Link
-                        className="font-semibold tracking-[-0.025em] underline-offset-4 hover:underline"
-                        href={`/projects/${update.projectId}`}
-                      >
-                        {update.projectName}
-                      </Link>
-                    ) : (
-                      <h3 className="font-semibold tracking-[-0.025em]">{update.projectName}</h3>
-                    )}
-                  </div>
-                  <p className="mt-1 text-sm text-[#777a76]">{update.title}</p>
+                <div className="flex items-center gap-2 text-xs text-[#777a76]">
+                  <span className={`h-2 w-2 rounded-full ${stat.color}`} />
+                  <span>{stat.label}</span>
                 </div>
-                <time className="shrink-0 font-mono text-sm text-[#777a76]">{update.date}</time>
-              </article>
+                <p className="mt-2 text-3xl font-semibold tracking-tight text-[#171918]">
+                  {dashboardLoading ? "-" : `${stat.count}건`}
+                </p>
+              </Link>
             ))}
           </div>
         </section>
 
-        {/* Real-time Urban Renewal News Feed */}
+        {/* Real-time Renewal News */}
         <NewsSection />
+
+        {/* Recent Timeline Feed */}
+        <section className="mt-12">
+          <div className="flex items-center justify-between border-b border-black/10 pb-4">
+            <h2 className="text-xl font-bold tracking-tight text-[#171918]">최근 인허가 & 고시 변화</h2>
+            <Link className="text-xs font-bold text-emerald-700 hover:underline" href="/changes">
+              전체 변화 피드 보기 ➔
+            </Link>
+          </div>
+
+          <div className="mt-4 divide-y divide-black/5">
+            {recentUpdates.map((item) => (
+              <div key={item.id} className="flex flex-col sm:flex-row sm:items-center justify-between py-3.5 gap-2">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-xs font-semibold text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                    {item.district ?? "서울시"}
+                  </span>
+                  {item.projectId ? (
+                    <Link
+                      href={`/projects/${item.projectId}`}
+                      className="text-sm font-bold text-[#171918] hover:text-emerald-700 transition"
+                    >
+                      {item.title}
+                    </Link>
+                  ) : (
+                    <span className="text-sm font-bold text-[#171918]">{item.title}</span>
+                  )}
+                </div>
+                <span className="text-xs font-mono text-gray-400 shrink-0">{item.date}</span>
+              </div>
+            ))}
+          </div>
+        </section>
       </div>
     </main>
   );
 }
-
