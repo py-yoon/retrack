@@ -9,8 +9,7 @@ import ProjectMapSection from "@/components/ProjectMapSection";
 import ProjectRiskRadar from "@/components/ProjectRiskRadar";
 import ProjectPdfReportButton from "@/components/ProjectPdfReportButton";
 import MembershipEligibilityCard from "@/components/MembershipEligibilityCard";
-import BuildingLedgerCard from "@/components/BuildingLedgerCard";
-import { getBuildingLedgerInfo } from "@/lib/data/building-ledger";
+import DistrictParcelsViewer from "@/components/DistrictParcelsViewer";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { calculateStagePipeline } from "@/lib/utils/stages";
 import { getNaverMapUrl } from "@/lib/utils/map";
@@ -236,6 +235,15 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
             district={project.district}
             projectType={project.project_type}
             currentStatus={project.current_status}
+          />
+        </section>
+
+        {/* Section 3: Official District Parcels & Building Ledgers */}
+        <section className="mt-10">
+          <DistrictParcelsViewer
+            projectId={project.id}
+            projectName={project.name}
+            district={project.district}
           />
         </section>
 
