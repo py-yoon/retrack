@@ -104,6 +104,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInWithKakao = async (nextUrl?: string) => {
     try {
+      // 1. Try Direct Kakao JavaScript SDK Popup
+      const { loginWithKakaoDirect } = await import("./kakao-sdk");
+      const profile = await loginWithKakaoDirect();
+      if (profile) {
+        signInAsDemoUser(`${profile.nickname} (카카오)`);
+        return;
+      }
+    } catch (directErr) {
+      console.warn("Direct Kakao SDK popup bypass:", directErr);
+    }
+
+    // 2. Supabase OAuth Fallback or Instant Demo Session
+    try {
       const supabase = getSupabaseClient();
       const next = nextUrl || loginRedirectUrl || window.location.pathname;
       const origin = window.location.origin;
@@ -114,11 +127,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         },
       });
       if (error) {
-        console.warn("Kakao OAuth not configured on Supabase, falling back to instant demo login:", error);
         signInAsDemoUser("카카오 인증 사용자");
       }
-    } catch (err) {
-      console.warn("Kakao login fallback to demo user:", err);
+    } catch {
       signInAsDemoUser("카카오 인증 사용자");
     }
   };

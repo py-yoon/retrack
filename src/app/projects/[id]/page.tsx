@@ -134,8 +134,6 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
     getProjectPolygon(project.id, centerCoords.lat, centerCoords.lng) ||
     getProjectPolygon(project.name, centerCoords.lat, centerCoords.lng);
 
-  const buildingLedger = getBuildingLedgerInfo(project.address || project.name);
-
   return (
     <main className="min-h-screen bg-[#f7f7f4] text-[#171918]">
       <div className="mx-auto max-w-5xl px-6 py-10 sm:px-10 sm:py-14">
