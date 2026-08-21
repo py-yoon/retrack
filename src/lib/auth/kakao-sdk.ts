@@ -8,14 +8,24 @@ declare global {
   }
 }
 
-// Default Public/Demo Kakao JS Key for instant testing (User can override via NEXT_PUBLIC_KAKAO_JS_KEY)
-const DEFAULT_KAKAO_JS_KEY = process.env.NEXT_PUBLIC_KAKAO_JS_KEY || "e4d257e849925e01df391dc7c5dbffea";
+const KAKAO_JS_KEY = process.env.NEXT_PUBLIC_KAKAO_JS_KEY;
 
 let isKakaoLoading = false;
 
+// 카카오 디벨로퍼스(https://developers.kakao.com)에서 발급받은 JavaScript 키를
+// NEXT_PUBLIC_KAKAO_JS_KEY 로 설정해야 한다. 그 앱의 "플랫폼 > Web"에 실제 접속
+// 도메인(예: http://localhost:3000, 배포 도메인)이 등록돼 있지 않으면 팝업이
+// 열리자마자 카카오 쪽에서 거부한다. 키가 없으면 시도조차 하지 않고 명확히
+// 실패시켜, 원인을 알 수 없는 팝업 에러 대신 바로 설정 문제라는 걸 알 수 있게 한다.
 export function loadKakaoSdk(): Promise<boolean> {
   return new Promise((resolve) => {
     if (typeof window === "undefined") return resolve(false);
+    if (!KAKAO_JS_KEY) {
+      console.warn(
+        "NEXT_PUBLIC_KAKAO_JS_KEY가 설정되지 않았습니다. 카카오 디벨로퍼스에서 JavaScript 키를 발급받아 .env.local에 추가하세요."
+      );
+      return resolve(false);
+    }
 
     if (window.Kakao && window.Kakao.isInitialized()) {
       return resolve(true);
@@ -23,7 +33,7 @@ export function loadKakaoSdk(): Promise<boolean> {
 
     if (window.Kakao && !window.Kakao.isInitialized()) {
       try {
-        window.Kakao.init(DEFAULT_KAKAO_JS_KEY);
+        window.Kakao.init(KAKAO_JS_KEY);
         return resolve(true);
       } catch {
         return resolve(false);
@@ -50,7 +60,7 @@ export function loadKakaoSdk(): Promise<boolean> {
     script.onload = () => {
       try {
         if (window.Kakao && !window.Kakao.isInitialized()) {
-          window.Kakao.init(DEFAULT_KAKAO_JS_KEY);
+          window.Kakao.init(KAKAO_JS_KEY);
         }
         resolve(true);
       } catch (err) {
@@ -78,7 +88,11 @@ export type KakaoUserProfile = {
 export async function loginWithKakaoDirect(): Promise<KakaoUserProfile | null> {
   const isLoaded = await loadKakaoSdk();
   if (!isLoaded || !window.Kakao) {
-    throw new Error("Kakao SDK not available");
+    throw new Error(
+      KAKAO_JS_KEY
+        ? "카카오 SDK를 불러오지 못했습니다. 네트워크 상태를 확인하거나 잠시 후 다시 시도하세요."
+        : "카카오 로그인이 아직 설정되지 않았습니다. (관리자: NEXT_PUBLIC_KAKAO_JS_KEY 설정 필요)"
+    );
   }
 
   return new Promise((resolve, reject) => {

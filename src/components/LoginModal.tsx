@@ -1,10 +1,18 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth/auth-context";
 
 export default function LoginModal() {
   const { isLoginModalOpen, closeLoginModal, signInWithKakao, signInWithGoogle, signInAsDemoUser, loginRedirectUrl } = useAuth();
+  const [error, setError] = useState<string | null>(null);
+
+  const handleKakaoLogin = () => {
+    setError(null);
+    signInWithKakao(loginRedirectUrl).catch((err) => {
+      setError(err instanceof Error ? err.message : "카카오 로그인에 실패했습니다.");
+    });
+  };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -52,7 +60,7 @@ export default function LoginModal() {
           {/* Kakao Login Button */}
           <button
             type="button"
-            onClick={() => signInWithKakao(loginRedirectUrl)}
+            onClick={handleKakaoLogin}
             className="flex h-12 w-full items-center justify-center gap-3 rounded-2xl bg-[#FEE500] font-semibold text-[#191919] transition hover:brightness-95 active:scale-[0.99] cursor-pointer shadow-xs"
           >
             <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
@@ -60,6 +68,9 @@ export default function LoginModal() {
             </svg>
             카카오로 3초 만에 시작하기
           </button>
+          {error && (
+            <p className="rounded-xl bg-red-50 px-3 py-2 text-xs font-medium text-red-700">{error}</p>
+          )}
 
           {/* Google Login Button */}
           <button

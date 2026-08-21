@@ -39,6 +39,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [, startTransition] = useTransition();
 
   useEffect(() => {
+    // 카카오 SDK를 미리 로드/초기화해 둔다. 로그인 버튼 클릭 시점에 스크립트를
+    // 그때부터 불러오면(await 지연) 팝업 오픈이 "사용자 제스처" 컨텍스트를 벗어나
+    // Safari 등에서 팝업 차단에 걸릴 수 있다.
+    import("./kakao-sdk").then(({ loadKakaoSdk }) => loadKakaoSdk());
+  }, []);
+
+  useEffect(() => {
     // Check demo user in localStorage first
     if (typeof window !== "undefined") {
       const demoSession = localStorage.getItem("retrack_demo_user");
@@ -102,36 +109,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoginModalOpen(false);
   };
 
-  const signInWithKakao = async (nextUrl?: string) => {
-    try {
-      // 1. Try Direct Kakao JavaScript SDK Popup
-      const { loginWithKakaoDirect } = await import("./kakao-sdk");
-      const profile = await loginWithKakaoDirect();
-      if (profile) {
-        signInAsDemoUser(`${profile.nickname} (카카오)`);
-        return;
-      }
-    } catch (directErr) {
-      console.warn("Direct Kakao SDK popup bypass:", directErr);
-    }
-
-    // 2. Supabase OAuth Fallback or Instant Demo Session
-    try {
-      const supabase = getSupabaseClient();
-      const next = nextUrl || loginRedirectUrl || window.location.pathname;
-      const origin = window.location.origin;
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "kakao",
-        options: {
-          redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(next)}`,
-        },
-      });
-      if (error) {
-        signInAsDemoUser("카카오 인증 사용자");
-      }
-    } catch {
-      signInAsDemoUser("카카오 인증 사용자");
-    }
+  const signInWithKakao = async (_nextUrl?: string) => {
+    // 카카오 JS SDK 직접 팝업 로그인 (Supabase Provider 설정 없이 동작).
+    //
+    // Supabase Authentication > Providers에 Kakao가 아직 설정돼 있지 않다
+    // (2026-08-21 확인). 이 상태에서 supabase.auth.signInWithOAuth({provider:"kakao"})를
+    // 호출하면 에러를 반환하는 게 아니라 즉시 브라우저를 Supabase의 authorize
+    // 엔드포인트로 리다이렉트시키고, 거기서 "provider not enabled" 에러를 만나
+    // 사용자 눈에는 이 앱을 완전히 벗어난 에러 페이지로 튕겨나가는 것처럼 보인다.
+    // Provider를 실제로 설정하기 전까지는 이 경로를 시도하지 않는다.
+    const { loginWithKakaoDirect } = await import("./kakao-sdk");
+    const profile = await loginWithKakaoDirect();
+    if (!profile) throw new Error("카카오 로그인이 취소되었습니다.");
+    signInAsDemoUser(`${profile.nickname} (카카오)`);
   };
 
   const signInWithGoogle = async (nextUrl?: string) => {
