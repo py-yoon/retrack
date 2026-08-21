@@ -16,7 +16,16 @@ import { calculateStagePipeline } from "@/lib/utils/stages";
 import { getNaverMapUrl } from "@/lib/utils/map";
 import { getProjectCoordinates } from "@/lib/utils/coordinates";
 import { getProjectPolygon } from "@/lib/data/project-polygons";
-import { findProjectFromCatalog } from "@/lib/data/projects-catalog";
+import { findProjectFromCatalog, PROJECTS_CATALOG } from "@/lib/data/projects-catalog";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+export async function generateStaticParams() {
+  return Object.keys(PROJECTS_CATALOG).map((id) => ({
+    id: id,
+  }));
+}
 
 type ProjectPageProps = { params: Promise<{ id: string }> };
 
