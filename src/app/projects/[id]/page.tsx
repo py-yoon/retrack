@@ -219,13 +219,6 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
           polygon={polygonCoords}
         />
 
-        {/* Section: Official Building Ledger & Aging Diagnosis */}
-        {buildingLedger && (
-          <section className="mt-10">
-            <BuildingLedgerCard ledger={buildingLedger} />
-          </section>
-        )}
-
         {/* Section 1: Membership Eligibility & Liquidation Shield */}
         <section className="mt-10">
           <MembershipEligibilityCard

@@ -283,13 +283,7 @@ export default function Home() {
 
     const term = text.trim().replaceAll(/\s+/g, "").toLowerCase();
 
-    // 1. Fetch Official Building Ledger Info
-    const ledger = getBuildingLedgerInfo(text);
-    if (ledger) {
-      setBuildingLedger(ledger);
-    }
-
-    // Check Official Project Catalog First
+    // 1. Check Official Project Catalog First (For District Name Searches)
     const catalogItem = findProjectFromCatalog(text);
     if (catalogItem) {
       setDiagnosisResult({
@@ -301,7 +295,18 @@ export default function Home() {
         message: `[${catalogItem.name}] 공식 정비구역 도면 및 사업지 정보가 확인되었습니다!`,
         tip: "현재 추진 단계, 실측 네이버 지도, 예상 분담금 및 안전마진 시뮬레이터를 확인하세요.",
       });
+      // 구역명 검색 시에는 단일 필지 건축물대장을 노출하지 않음
+      setBuildingLedger(null);
       return;
+    }
+
+    // 2. Fetch Official Building Ledger Info (Only when specific parcel/lot number with digits is entered)
+    const hasLotNumber = /\d+/.test(text);
+    if (hasLotNumber) {
+      const ledger = getBuildingLedgerInfo(text);
+      if (ledger) {
+        setBuildingLedger(ledger);
+      }
     }
 
     let matched: { id: string; name: string; district: string; stage: string } | null = null;
