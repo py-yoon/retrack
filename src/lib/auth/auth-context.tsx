@@ -61,7 +61,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (profileParam) {
       try {
-        const decoded = JSON.parse(atob(profileParam));
+        // atob()는 base64를 바이트별 "binary string"으로만 디코딩할 뿐 UTF-8을
+        // 모른다. 그대로 JSON.parse에 넘기면 닉네임의 한글이 깨진다. 바이트로
+        // 되돌린 뒤 TextDecoder로 UTF-8 디코딩해야 한다.
+        const bytes = Uint8Array.from(atob(profileParam), (c) => c.charCodeAt(0));
+        const decoded = JSON.parse(new TextDecoder("utf-8").decode(bytes));
         signInAsDemoUser(`${decoded.nickname} (카카오)`, {
           id: `kakao_${decoded.id}`,
           email: decoded.email,
