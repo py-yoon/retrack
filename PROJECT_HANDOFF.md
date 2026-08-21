@@ -235,6 +235,25 @@ npx supabase migration list
 1. **실제 카카오 비즈메시지 API 연동**: Solapi, 카카오 i 비즈메시지, 알림톡 API 키 발송 모듈 연동
 2. **지도 기반 시각화 (Map View)**: 서울시 지도 위에 사업장 위치 및 최근 변동 핫스팟 시각화
 
+## 11. 작업 이력 — 2026-08-21
 
+### 네이버 지도 미표시 문제 해결
 
+| 문제 | 원인 | 조치 |
+| --- | --- | --- |
+| `/map`, 사업장 상세 지도가 회색으로 뜨거나 아예 안 보임 | 네이버가 인증 파라미터를 `ncpClientId` → `ncpKeyId`로 통합(구 파라미터 폐기)했는데 코드는 옛 파라미터 사용 중 | `NaverMapView.tsx`, `ProjectDetailMap.tsx`, `retrack_naver_map_demo.html`의 스크립트 URL을 `ncpKeyId`로 변경 |
+| 인증 실패 시에도 회색 지도로 방치 | `navermap_authFailure` 전역 콜백 미등록 | 콜백 등록 후 실패 시 Leaflet 폴백 엔진으로 자동 전환 |
+| 사업장 상세 페이지 방문 후 `/map`으로 이동하면 지도가 초기화조차 안 됨 | `next/script`가 스크립트 src를 전역 `LoadCache`에 기록해두고, 이미 로드된 src로 재마운트되는 두 번째 페이지에서는 `onLoad` 콜백을 아예 호출하지 않음(Next 자체 동작) | 컴포넌트 mount 시 `window.naver.maps`가 이미 존재하는지 직접 확인해서, 존재하면 `onLoad`를 기다리지 않고 즉시 초기화하도록 방어 로직 추가 |
+
+관련 커밋: `a785cbe`
+
+### Supabase anon key 오류 수정
+
+`.env.local`의 `NEXT_PUBLIC_SUPABASE_ANON_KEY`가 `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.dummy`라는 더미 값으로 되어 있어 모든 Supabase 조회가 401로 실패하고 있었다(사업장 상세의 로컬 카탈로그 데이터는 뜨지만 `events`인가 고시 등 실제 DB 데이터는 전혀 표시되지 않는 증상). 새 Supabase publishable key(`sb_publishable_...`)로 교체해 해결했다. **이 값은 `.env.local`에만 있고 git에는 올라가지 않으므로, 배포 환경(Vercel 등)의 환경 변수도 별도로 갱신해야 한다.**
+
+### 확인된 미해결 항목
+
+- **GitHub Actions 시크릿 미설정**: `gh secret list` 결과 현재 레포에 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SEOUL_OPENAPI_KEY` 시크릿이 하나도 등록돼 있지 않다. `.github/workflows/data-sync.yml`(매일 자동 수집)이 이 값들을 요구하므로, 시크릿을 등록하기 전까지 자동 수집은 사실상 동작하지 않았을 가능성이 높다.
+- **`SEOUL_OPENAPI_KEY` 로컬에도 없음**: `.env.local`에 이 키가 아예 없어 로컬에서 `npm run data:sync`/`data:projects` 등 서울시 Open API 연동 스크립트를 실행할 수 없는 상태다. 서울 열린데이터광장에서 발급받아 추가해야 한다.
+- **네이버 지도 Web 서비스 URL 등록 여부 미확인**: 로컬(`localhost`)에서는 지도가 정상 렌더링되는 것을 확인했지만, 현재 키(`nbhyehsios`)가 실제 배포 도메인을 NCP(네이버클라우드플랫폼) 콘솔의 "Web 서비스 URL"에 등록해 뒀는지는 콘솔 접근 권한이 없어 확인하지 못했다. 배포 후에도 지도가 안 뜨면 이 등록부터 점검할 것.
 
