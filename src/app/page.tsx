@@ -7,6 +7,8 @@ import Header from "@/components/Header";
 import NewsSection from "@/components/NewsSection";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { isPureChosung, matchHangulSearch } from "@/lib/utils/hangul";
+import BuildingLedgerCard from "@/components/BuildingLedgerCard";
+import { getBuildingLedgerInfo, type BuildingLedgerInfo } from "@/lib/data/building-ledger";
 
 type RecentUpdate = {
   id: string;
@@ -81,6 +83,7 @@ export default function Home() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [diagnosisResult, setDiagnosisResult] = useState<DiagnosisResult | null>(null);
+  const [buildingLedger, setBuildingLedger] = useState<BuildingLedgerInfo | null>(null);
 
   // Load Dashboard
   useEffect(() => {
@@ -299,8 +302,15 @@ export default function Home() {
     if (!text.trim()) return;
     setIsDropdownOpen(false);
     setDiagnosisResult(null);
+    setBuildingLedger(null);
 
     const term = text.trim().replaceAll(/\s+/g, "").toLowerCase();
+
+    // 1. Fetch Official Building Ledger Info
+    const ledger = getBuildingLedgerInfo(text);
+    if (ledger) {
+      setBuildingLedger(ledger);
+    }
 
     let matched: { id: string; name: string; district: string; stage: string } | null = null;
     for (const item of Object.values(ADDRESS_MATCH_DB)) {
@@ -511,6 +521,13 @@ export default function Home() {
                 <p className="mt-3 text-xs text-gray-600 border-t border-black/5 pt-2 leading-relaxed">
                   💡 <strong>투자 가이드</strong>: {diagnosisResult.tip}
                 </p>
+              </div>
+            )}
+
+            {/* Building Ledger Card */}
+            {buildingLedger && (
+              <div className="mt-4">
+                <BuildingLedgerCard ledger={buildingLedger} />
               </div>
             )}
           </div>

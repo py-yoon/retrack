@@ -9,6 +9,8 @@ import ProjectMapSection from "@/components/ProjectMapSection";
 import ProjectRiskRadar from "@/components/ProjectRiskRadar";
 import ProjectPdfReportButton from "@/components/ProjectPdfReportButton";
 import MembershipEligibilityCard from "@/components/MembershipEligibilityCard";
+import BuildingLedgerCard from "@/components/BuildingLedgerCard";
+import { getBuildingLedgerInfo } from "@/lib/data/building-ledger";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { calculateStagePipeline } from "@/lib/utils/stages";
 import { getNaverMapUrl } from "@/lib/utils/map";
@@ -139,6 +141,8 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
     getProjectPolygon(project.id, centerCoords.lat, centerCoords.lng) ||
     getProjectPolygon(project.name, centerCoords.lat, centerCoords.lng);
 
+  const buildingLedger = getBuildingLedgerInfo(project.address || project.name);
+
   return (
     <main className="min-h-screen bg-[#f7f7f4] text-[#171918]">
       <div className="mx-auto max-w-5xl px-6 py-10 sm:px-10 sm:py-14">
@@ -220,6 +224,13 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
           center={centerCoords}
           polygon={polygonCoords}
         />
+
+        {/* Section: Official Building Ledger & Aging Diagnosis */}
+        {buildingLedger && (
+          <section className="mt-10">
+            <BuildingLedgerCard ledger={buildingLedger} />
+          </section>
+        )}
 
         {/* Section 1: Membership Eligibility & Liquidation Shield */}
         <section className="mt-10">
