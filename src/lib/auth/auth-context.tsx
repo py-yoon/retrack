@@ -112,14 +112,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const supabase = getSupabaseClient();
     const next = nextUrl || loginRedirectUrl || window.location.pathname;
     const origin = window.location.origin;
+    // Supabase의 카카오 provider는 account_email/profile_image/profile_nickname을
+    // 항상 요청한다 — options.scopes를 줘도 대체가 아니라 그 뒤에 추가만 되고
+    // 기본 3개는 빠지지 않는다(Supabase 쪽 알려진 제한, supabase/supabase#29917,
+    // #36878). 그래서 카카오 앱의 동의항목에 이 세 개를 다 설정해 둬야 한다.
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "kakao",
       options: {
         redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(next)}`,
-        // Supabase 기본값(account_email profile_image profile_nickname)은 카카오
-        // 앱의 동의항목에 이메일/프로필사진까지 다 설정해야 해서 번거롭다.
-        // 닉네임만 요청해 최소한으로 줄인다 — 이메일/프로필사진은 못 받는다.
-        scopes: "profile_nickname",
       },
     });
     if (error) {
