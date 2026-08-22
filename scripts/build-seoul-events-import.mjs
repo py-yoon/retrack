@@ -1,77 +1,35 @@
 import { writeFile } from "node:fs/promises";
 import { resolveDistrict } from "./lib/seoul-districts.mjs";
+import {
+  clean,
+  determineEventType,
+  determineImportance,
+  fetchUpisRebuildProjects,
+  buildProjectIndex,
+  matchProject,
+  sqlValue,
+} from "./lib/notice-matching.mjs";
 
 const key = process.env.SEOUL_OPENAPI_KEY;
 const output = process.env.IMPORT_OUTPUT ?? "/tmp/retrack-seoul-events.sql";
 if (!key) throw new Error("SEOUL_OPENAPI_KEY가 필요합니다.");
 
-async function fetchAll(service) {
+async function fetchNotices() {
   const rows = [];
   for (let start = 1; ; start += 1000) {
-    const response = await fetch(`http://openapi.seoul.go.kr:8088/${key}/json/${service}/${start}/${start + 999}/`);
-    if (!response.ok) throw new Error(`${service} 요청 실패: ${response.status}`);
+    const response = await fetch(`http://openapi.seoul.go.kr:8088/${key}/json/TbWcmBoardB0414/${start}/${start + 999}/`);
+    if (!response.ok) throw new Error(`TbWcmBoardB0414 요청 실패: ${response.status}`);
     const body = await response.json();
-    const result = body?.[service];
-    if (result?.RESULT?.CODE !== "INFO-000") throw new Error(result?.RESULT?.MESSAGE ?? `${service} 응답 오류`);
+    const result = body?.TbWcmBoardB0414;
+    if (result?.RESULT?.CODE !== "INFO-000") throw new Error(result?.RESULT?.MESSAGE ?? "TbWcmBoardB0414 응답 오류");
     rows.push(...(result.row ?? []));
     if (rows.length >= Number(result.list_total_count) || (result.row ?? []).length === 0) break;
   }
   return rows;
 }
 
-const [projectRows, noticeRows] = await Promise.all([fetchAll("upisRebuild"), fetchAll("TbWcmBoardB0414")]);
-
-// Group projects by PRJC_CD
-const projects = new Map();
-for (const row of projectRows) {
-  if (!row.PRJC_CD) continue;
-  if (!projects.has(row.PRJC_CD)) projects.set(row.PRJC_CD, []);
-  projects.get(row.PRJC_CD).push(row);
-}
-
-const clean = (value) => String(value ?? "").replaceAll(/<[^>]*>/g, " ").replaceAll(/\s+/g, " ").trim();
-const normalize = (value) => clean(value).replaceAll(/[^가-힣a-zA-Z0-9]/g, "").toLowerCase();
-
-const STOP_WORDS = new Set([
-  "서울특별시", "서울시", "서울", "도시환경정비", "도시환경정비구역", "도시환경정비지구", "도시정비형",
-  "주택재개발", "주택재건축", "주택재개발정비사업", "주택재건축정비사업", "재정비촉진", "재정비촉진지구", "재정비촉진구역",
-  "재개발사업", "재건축사업", "정비사업", "재개발", "재건축", "도시계획", "정비구역", "지구단위계획",
-  "공동주택", "아파트", "구역", "지구"
-]);
-
-const projectSearch = [...projects.entries()].map(([code, pRows]) => {
-  const combinedText = pRows.map((r) => `${r.PSTN_NM ?? ""} ${r.RGN_NM ?? ""}`).join(" ");
-  const allCodes = pRows.flatMap((r) => [r.PRJC_CD, r.RPT_MNG_CD, r.DCSN_ANCMNT_MNG_CD]).filter(Boolean);
-  const district = resolveDistrict({ text: combinedText, codes: allCodes });
-  const names = pRows.map((r) => r.RGN_NM).filter(Boolean);
-  const addrs = pRows.map((r) => r.PSTN_NM).filter(Boolean);
-
-  // Extract clean project names without generic stop words
-  const searchKeywords = [...new Set([...names, ...addrs])]
-    .map(normalize)
-    .filter((k) => k.length >= 3 && !STOP_WORDS.has(k) && !k.startsWith("서울특별시"));
-
-  return { code, district, searchKeywords };
-});
-
-const sqlValue = (value) => value == null || value === "" ? "null" : `'${String(value).replaceAll("'", "''")}'`;
-
-function determineImportance(title) {
-  if (/관리처분|사업시행계획인가|사업시행인가|조합설립인가|정비구역\s*지정|준공인가|착공|시공사\s*선정|분양가|이주/.test(title)) {
-    return 3; // 중요
-  }
-  if (/공람|설명회|의견청취|열람|환경영향평가|정비계획\s*변경|공청회/.test(title)) {
-    return 2; // 일반
-  }
-  return 1; // 낮음
-}
-
-function determineEventType(title) {
-  if (/인가/.test(title)) return "인가";
-  if (/고시/.test(title)) return "고시";
-  if (/변경/.test(title)) return "계획변경";
-  return "공고";
-}
+const [projectRows, noticeRows] = await Promise.all([fetchUpisRebuildProjects(key), fetchNotices()]);
+const projectIndex = buildProjectIndex(projectRows);
 
 let crossDistrictMismatchCount = 0;
 const statements = [];
@@ -81,31 +39,12 @@ for (const notice of noticeRows) {
   const noticeContent = clean(notice.CN ?? "");
   const noticeText = `${noticeTitle} ${noticeContent}`;
   const noticeDistrict = resolveDistrict({ text: noticeText });
-  const normalizedNotice = normalize(noticeText);
 
-  let bestProject = null;
-  for (const candidate of projectSearch) {
-    if (candidate.searchKeywords.length === 0) continue;
-
-    // Strict district validation
-    if (noticeDistrict && candidate.district && noticeDistrict !== candidate.district) {
-      crossDistrictMismatchCount++;
-      continue;
-    }
-    if (noticeDistrict && !candidate.district) {
-      continue;
-    }
-
-    const isKeywordMatch = candidate.searchKeywords.some((keyword) => {
-      if (keyword.length < 3) return false;
-      return normalizedNotice.includes(keyword);
-    });
-
-    if (!isKeywordMatch) continue;
-
-    bestProject = candidate;
-    break;
-  }
+  const { project: bestProject, crossDistrictMismatch } = matchProject(projectIndex, {
+    district: noticeDistrict,
+    text: noticeText,
+  });
+  crossDistrictMismatchCount += crossDistrictMismatch;
 
   if (!bestProject || !notice.PST_SN) continue;
 

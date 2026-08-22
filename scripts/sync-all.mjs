@@ -3,6 +3,9 @@
  *
  * 1. 서울시 정비사업장 수집 & 자치구 매칭 -> DB 반영
  * 2. 서울시 공고 이벤트 수집 & 사업장 매칭 -> DB 반영
+ *    - 서울시 Open API(TbWcmBoardB0414)는 2023년 4월 이후 갱신이 멈춰 있어,
+ *      실제로 매주 갱신되는 news.seoul.go.kr 및 cleanup.seoul.go.kr 게시판을
+ *      함께 수집해 최신 인가·고시 이벤트를 보완한다.
  * 3. 서울시 정보몽땅 추진단계 수집 & 매칭 -> DB 반영
  * 4. 최종 DB 적재 상태 검증 및 요약 리포트 출력
  */
@@ -24,10 +27,20 @@ try {
   console.log("  ✔ 사업장 데이터 동기화 완료!\n");
 
   // Step 2: Events
-  console.log("▶ [2/4] 서울시 시행계획 공고 이벤트 수집 및 SQL 생성 중...");
+  console.log("▶ [2/4] 서울시 시행계획 공고 이벤트 수집 및 SQL 생성 중... (Open API, 2023년 이후 정지)");
   execSync("node --env-file=.env.local scripts/build-seoul-events-import.mjs", { stdio: "inherit" });
   console.log("  ↳ 원격 DB에 공고 이벤트 데이터 반영 중...");
   execSync("npx supabase db query --linked --file /tmp/retrack-seoul-events.sql", { stdio: "inherit" });
+
+  console.log("  ↳ 서울시 뉴스 주간 열람공고·결정고시 수집 및 SQL 생성 중...");
+  execSync("node --env-file=.env.local scripts/build-news-seoul-events-import.mjs", { stdio: "inherit" });
+  console.log("  ↳ 원격 DB에 반영 중...");
+  execSync("npx supabase db query --linked --file /tmp/retrack-news-seoul-events.sql", { stdio: "inherit" });
+
+  console.log("  ↳ 정보몽땅 고시/공고 게시판 수집 및 SQL 생성 중...");
+  execSync("node --env-file=.env.local scripts/build-cleanup-notices-import.mjs", { stdio: "inherit" });
+  console.log("  ↳ 원격 DB에 반영 중...");
+  execSync("npx supabase db query --linked --file /tmp/retrack-cleanup-notices.sql", { stdio: "inherit" });
   console.log("  ✔ 공고 이벤트 데이터 동기화 완료!\n");
 
   // Step 3: Stages

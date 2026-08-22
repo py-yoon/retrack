@@ -9,6 +9,8 @@
     "lint": "eslint",
     "data:projects": "node --env-file=.env.local scripts/build-seoul-import.mjs",
     "data:events": "node --env-file=.env.local scripts/build-seoul-events-import.mjs",
+    "data:events:news": "node --env-file=.env.local scripts/build-news-seoul-events-import.mjs",
+    "data:events:cleanup-notices": "node --env-file=.env.local scripts/build-cleanup-notices-import.mjs",
     "data:stages": "node --env-file=.env.local scripts/build-cleanup-stages-import.mjs",
     "data:audit": "node --env-file=.env.local scripts/audit-matching.mjs",
     "data:sync": "node --env-file=.env.local scripts/sync-all.mjs"
