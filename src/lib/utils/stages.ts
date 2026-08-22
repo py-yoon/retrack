@@ -4,6 +4,8 @@ export type StageStep = {
   shortName: string;
   status: "completed" | "current" | "upcoming";
   date?: string | null;
+  firstDate?: string | null;
+  latestDate?: string | null;
   description: string;
 };
 
@@ -13,7 +15,7 @@ export const STANDARD_STAGES = [
     name: "정비구역 지정",
     shortName: "구역지정",
     order: 10,
-    aliases: ["정비구역", "정비구역지정", "정비계획 수립", "정비계획", "기본계획", "안전진단"],
+    aliases: ["정비구역", "정비구역지정", "정비계획 수립", "정비계획", "기본계획", "안전진단", "구역지정및계획결정", "지구단위계획"],
     description: "정비구역이 고시되어 개발 사업이 공식화된 단계입니다.",
   },
   {
@@ -102,7 +104,6 @@ export function calculateStagePipeline(
       const eTitle = e.title.replace(/\s+/g, "");
       for (let i = 0; i < STANDARD_STAGES.length; i++) {
         const stage = STANDARD_STAGES[i];
-        // Match specific keywords for stages (e.g. 사업시행인가, 관리처분인가, 조합설립인가)
         if (stage.aliases.some((alias) => eTitle.includes(alias))) {
           if (stage.id > currentStageIndex) {
             currentStageIndex = stage.id;
@@ -112,14 +113,18 @@ export function calculateStagePipeline(
     }
   }
 
-  // Create date lookup map
-  const dateMap = new Map<number, string>();
+  // Collect ALL dates per stage to track both FIRST (최초) and LATEST (최근/변경) dates
+  const stageDatesMap = new Map<number, Set<string>>();
+  for (const stage of STANDARD_STAGES) {
+    stageDatesMap.set(stage.id, new Set<string>());
+  }
+
   if (stagesData) {
     for (const s of stagesData) {
       if (s.approved_at) {
         for (const stage of STANDARD_STAGES) {
           if (stage.aliases.some((a) => s.stage_name.includes(a))) {
-            dateMap.set(stage.id, s.approved_at);
+            stageDatesMap.get(stage.id)?.add(s.approved_at.slice(0, 10));
           }
         }
       }
@@ -128,9 +133,11 @@ export function calculateStagePipeline(
 
   if (eventsData) {
     for (const e of eventsData) {
-      for (const stage of STANDARD_STAGES) {
-        if (stage.aliases.some((a) => e.title.includes(a)) && !dateMap.has(stage.id)) {
-          dateMap.set(stage.id, e.occurred_at);
+      if (e.occurred_at) {
+        for (const stage of STANDARD_STAGES) {
+          if (stage.aliases.some((a) => e.title.includes(a))) {
+            stageDatesMap.get(stage.id)?.add(e.occurred_at.slice(0, 10));
+          }
         }
       }
     }
@@ -144,12 +151,32 @@ export function calculateStagePipeline(
       status = "current";
     }
 
+    const rawDates = Array.from(stageDatesMap.get(stage.id) ?? []).filter(Boolean);
+    rawDates.sort((a, b) => a.localeCompare(b)); // Sort chronologically (oldest to newest)
+
+    let firstDate: string | null = null;
+    let latestDate: string | null = null;
+    let formattedDate: string | null = null;
+
+    if (rawDates.length === 1) {
+      firstDate = rawDates[0];
+      latestDate = rawDates[0];
+      formattedDate = rawDates[0];
+    } else if (rawDates.length > 1) {
+      firstDate = rawDates[0]; // Earliest date (최초 구역지정/승인)
+      latestDate = rawDates[rawDates.length - 1]; // Latest date (최근 변경/고시)
+      // If dates differ, format clearly with both
+      formattedDate = `${firstDate} (최근 ${latestDate})`;
+    }
+
     return {
       id: stage.id,
       name: stage.name,
       shortName: stage.shortName,
       status,
-      date: dateMap.get(stage.id) ?? null,
+      date: formattedDate,
+      firstDate,
+      latestDate,
       description: stage.description,
     };
   });

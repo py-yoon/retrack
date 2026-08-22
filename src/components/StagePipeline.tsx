@@ -34,6 +34,7 @@ export default function StagePipeline({ steps, currentStatus }: StagePipelinePro
         {steps.map((step, idx) => {
           const isCompleted = step.status === "completed";
           const isCurrent = step.status === "current";
+          const hasMultipleDates = step.firstDate && step.latestDate && step.firstDate !== step.latestDate;
 
           return (
             <div key={step.id} className="relative flex items-start gap-4">
@@ -86,11 +87,21 @@ export default function StagePipeline({ steps, currentStatus }: StagePipelinePro
                     )}
                   </div>
 
-                  {step.date && (
+                  {/* Date Display: Displays both Initial & Recent/Changed dates if multiple */}
+                  {hasMultipleDates ? (
+                    <div className="flex items-center gap-1.5 text-xs font-mono">
+                      <span className="text-[#171918] font-semibold bg-gray-100 px-2 py-0.5 rounded-md text-[11px]" title="최초 지정/승인일">
+                        최초 {step.firstDate?.replaceAll("-", ".")}
+                      </span>
+                      <span className="text-[#777a76] text-[11px]" title="최근 변경/고시일">
+                        (변경 {step.latestDate?.replaceAll("-", ".")})
+                      </span>
+                    </div>
+                  ) : step.date ? (
                     <time className="font-mono text-xs text-[#777a76]">
                       {step.date.replaceAll("-", ".")}
                     </time>
-                  )}
+                  ) : null}
                 </div>
 
                 <p

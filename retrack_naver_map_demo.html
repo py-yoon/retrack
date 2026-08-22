@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>마포로1-24도시환경정비지구 | RE:TRACK</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Naver Map API -->
+  <script src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=nbhyehsios&submodules=geocoder"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans KR', sans-serif; }
+    .pulse-animation {
+      animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-[#f7f7f4] text-[#171918] antialiased">
+
+  <div class="mx-auto max-w-5xl px-4 py-8 sm:px-10 sm:py-12">
+    
+    <!-- Top Header -->
+    <header class="flex items-center justify-between border-b border-black/10 pb-5">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-xl bg-[#171918] flex items-center justify-center text-white font-bold text-sm shadow-sm">
+          RT
+        </div>
+        <span class="font-black text-xl tracking-tight">RE:TRACK</span>
+        <span class="text-xs bg-emerald-100 text-emerald-800 font-semibold px-2.5 py-0.5 rounded-full border border-emerald-300">
+          서울 정비사업 레이더
+        </span>
+      </div>
+      <div class="text-xs text-[#777a76]">
+        📍 서울시 마포구 도화동 16-1 일대
+      </div>
+    </header>
+
+    <!-- Project Header Profile -->
+    <section class="pt-8">
+      <div class="flex flex-wrap items-center justify-between gap-4">
+        <p class="text-xs font-bold tracking-[0.12em] text-[#e6523a]">PROJECT PROFILE</p>
+        <button class="px-3.5 py-1.5 rounded-xl bg-[#171918] text-white text-xs font-bold shadow-sm hover:bg-black/80 transition">
+          ★ 관심 사업장 등록
+        </button>
+      </div>
+      <h1 class="mt-2 text-3xl font-extrabold tracking-tight sm:text-4xl">
+        마포로1-24도시환경정비지구
+      </h1>
+      
+      <div class="mt-3 flex flex-wrap items-center gap-2 text-xs">
+        <span class="text-[#6e716e]">서울특별시 마포구 도화동 16-1 일대</span>
+        <a href="https://map.naver.com/p/search/%EB%A7%88%ED%8F%AC%EB%A1%9C1-24%EB%8F%84%EC%8B%9C%ED%99%98%EA%B2%BD%EC%A0%95%EB%B9%84%EC%A7%80%EA%B5%AC" target="_blank" class="inline-flex items-center gap-1 rounded-lg border border-emerald-600/30 bg-emerald-50 px-2.5 py-1 font-bold text-emerald-800 hover:bg-emerald-100 transition">
+          <span>🗺️ 네이버 지도 앱에서 보기 ↗</span>
+        </a>
+      </div>
+
+      <!-- Quick Info Cards -->
+      <div class="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div class="rounded-2xl border border-black/8 bg-white p-4 shadow-sm">
+          <p class="text-xs text-[#777a76]">자치구</p>
+          <p class="mt-1 font-bold text-base text-[#171918]">마포구</p>
+        </div>
+        <div class="rounded-2xl border border-black/8 bg-white p-4 shadow-sm">
+          <p class="text-xs text-[#777a76]">현재 단계</p>
+          <p class="mt-1 font-bold text-base text-blue-600">사업시행인가</p>
+        </div>
+        <div class="rounded-2xl border border-black/8 bg-white p-4 shadow-sm">
+          <p class="text-xs text-[#777a76]">사업 유형</p>
+          <p class="mt-1 font-bold text-base text-[#171918]">도시정비형 재개발</p>
+        </div>
+        <div class="rounded-2xl border border-black/8 bg-white p-4 shadow-sm">
+          <p class="text-xs text-[#777a76]">업데이트</p>
+          <p class="mt-1 font-bold text-base text-[#171918]">2026.08.21</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION: NAVER MAP WITH POLYGON & CADASTRAL -->
+    <section class="mt-8">
+      <div class="mb-3 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <h2 class="text-lg font-bold tracking-tight text-[#171918]">🗺️ 구역 위치 및 지적도</h2>
+          <span class="text-xs font-semibold text-[#777a76]">네이버 지도 구역 폴리곤 렌더링</span>
+        </div>
+        <span class="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full shadow-2xs">
+          ● 실시간 지도 연동
+        </span>
+      </div>
+
+      <!-- Naver Map Container -->
+      <div class="relative w-full rounded-2xl overflow-hidden border border-black/10 bg-[#f7f7f4] shadow-md">
+        
+        <!-- Map Canvas -->
+        <div id="naver-map" class="w-full h-[420px] sm:h-[480px]"></div>
+
+        <!-- Top Map Controls Overlay -->
+        <div class="absolute top-3 left-3 z-10 flex flex-wrap items-center gap-2 pointer-events-auto">
+          
+          <div class="flex items-center gap-1.5 bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-xl border border-black/10 shadow-sm text-xs font-bold text-[#171918]">
+            <span class="w-2.5 h-2.5 rounded-full inline-block bg-blue-500"></span>
+            <span>사업시행인가 구역</span>
+          </div>
+
+          <button id="btn-cadastral" class="px-3 py-1.5 rounded-xl border text-xs font-bold transition shadow-sm bg-white/95 border-black/10 text-[#171918] hover:bg-black/5">
+            지적편집도
+          </button>
+
+          <button id="btn-maptype" class="px-3 py-1.5 rounded-xl border text-xs font-bold transition shadow-sm bg-white/95 border-black/10 text-[#171918] hover:bg-black/5">
+            위성지도
+          </button>
+
+          <button id="btn-reset-center" class="px-3 py-1.5 rounded-xl border border-black/10 bg-white/95 text-xs font-bold text-[#171918] hover:bg-black/5 transition shadow-sm">
+            🎯 구역 중심
+          </button>
+        </div>
+
+        <!-- Bottom Info Bar -->
+        <div class="absolute bottom-3 left-3 right-3 z-10 flex items-center justify-between pointer-events-auto bg-white/95 backdrop-blur-md px-4 py-2.5 rounded-xl border border-black/10 shadow-sm text-xs">
+          <div class="flex items-center gap-2 truncate">
+            <span class="font-bold text-[#171918]">마포로1-24도시환경정비지구</span>
+            <span class="text-[#777a76] hidden sm:inline">서울특별시 마포구 도화동 16-1 일대</span>
+          </div>
+          <span class="font-bold text-blue-600 shrink-0 ml-2">
+            ✓ 네이버 Polygon & 지적도 연동 완료
+          </span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Project Timeline & Events -->
+    <section class="mt-8 grid gap-6 sm:grid-cols-2">
+      <div class="rounded-2xl border border-black/8 bg-white p-5 shadow-sm">
+        <h3 class="font-bold text-sm text-[#171918] mb-3">📋 추진 단계 현황</h3>
+        <div class="space-y-2 text-xs">
+          <div class="flex items-center justify-between p-2.5 rounded-lg bg-gray-50 border border-gray-100">
+            <span class="font-medium text-gray-700">1. 정비구역 지정</span>
+            <div class="flex items-center gap-1.5 font-mono text-[11px]">
+              <span class="bg-gray-200 text-[#171918] font-bold px-1.5 py-0.5 rounded">최초 2012.05</span>
+              <span class="text-gray-500">(변경 2023.08)</span>
+            </div>
+          </div>
+          <div class="flex items-center justify-between p-2 rounded-lg bg-gray-50 border border-gray-100">
+            <span class="font-medium text-gray-500">2. 추진위원회 승인</span>
+            <span class="text-gray-400">완료</span>
+          </div>
+          <div class="flex items-center justify-between p-2 rounded-lg bg-gray-50 border border-gray-100">
+            <span class="font-medium text-gray-500">3. 조합설립인가</span>
+            <span class="text-gray-400">완료</span>
+          </div>
+          <div class="flex items-center justify-between p-2 rounded-lg bg-blue-50 border border-blue-200 font-bold text-blue-800">
+            <span>4. 사업시행인가 (현재 단계)</span>
+            <span class="bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-full">진행중</span>
+          </div>
+          <div class="flex items-center justify-between p-2 rounded-lg bg-gray-50/50 border border-gray-100 text-gray-400">
+            <span>5. 관리처분인가</span>
+            <span>예정</span>
+          </div>
+          <div class="flex items-center justify-between p-2 rounded-lg bg-gray-50/50 border border-gray-100 text-gray-400">
+            <span>6. 착공 및 분양</span>
+            <span>예정</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="rounded-2xl border border-black/8 bg-white p-5 shadow-sm">
+        <h3 class="font-bold text-sm text-[#171918] mb-3">📢 최근 공고 및 변경 이력</h3>
+        <div class="space-y-2.5 text-xs">
+          <div class="p-3 rounded-xl border border-blue-100 bg-blue-50/50">
+            <div class="flex items-center justify-between text-[#777a76] text-[11px]">
+              <span class="font-bold text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded">인가</span>
+              <span>2024.03.15</span>
+            </div>
+            <p class="font-bold text-[#171918] mt-1.5">마포로1-24도시환경정비지구 사업시행변경인가 공람공고</p>
+            <p class="text-[11px] text-[#777a76] mt-1">출처: 서울시 도시계획 시행계획 공고 정보</p>
+          </div>
+          <div class="p-3 rounded-xl border border-gray-100 bg-gray-50">
+            <div class="flex items-center justify-between text-[#777a76] text-[11px]">
+              <span class="font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">계획변경</span>
+              <span>2023.08.20</span>
+            </div>
+            <p class="font-bold text-[#171918] mt-1.5">마포로1구역 도시정비형 재개발사업 정비계획 변경결정</p>
+            <p class="text-[11px] text-[#777a76] mt-1">출처: 서울시 정비사업 정보몽땅</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- Naver Map Script Implementation -->
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      // 1. Coordinates for Mapo-ro 1-24 District
+      const centerCoords = { lat: 37.53955, lng: 126.9471 };
+      
+      const polygonCoords = [
+        { lat: 37.53982, lng: 126.94635 },
+        { lat: 37.54015, lng: 126.94720 },
+        { lat: 37.53995, lng: 126.94785 },
+        { lat: 37.53935, lng: 126.94798 },
+        { lat: 37.53895, lng: 126.94732 },
+        { lat: 37.53912, lng: 126.94640 },
+        { lat: 37.53955, lng: 126.94615 },
+      ];
+
+      const stageColor = "#3b82f6"; // 사업시행인가 (파란색)
+
+      // 2. Initialize Naver Map
+      const mapContainer = document.getElementById("naver-map");
+      const mapCenter = new naver.maps.LatLng(centerCoords.lat, centerCoords.lng);
+
+      const map = new naver.maps.Map(mapContainer, {
+        center: mapCenter,
+        zoom: 17,
+        minZoom: 12,
+        maxZoom: 19,
+        zoomControl: true,
+        zoomControlOptions: {
+          position: naver.maps.Position.TOP_RIGHT,
+        },
+        mapTypeControl: false,
+      });
+
+      // 3. Render Polygon (구역 경계선)
+      const paths = polygonCoords.map(p => new naver.maps.LatLng(p.lat, p.lng));
+      
+      const polygon = new naver.maps.Polygon({
+        map: map,
+        paths: paths,
+        fillColor: stageColor,
+        fillOpacity: 0.38,
+        strokeColor: stageColor,
+        strokeOpacity: 0.95,
+        strokeWeight: 3,
+        strokeLineJoin: "round",
+        clickable: true,
+      });
+
+      // Polygon Hover & Click Effects
+      naver.maps.Event.addListener(polygon, "mouseover", function () {
+        polygon.setOptions({ fillOpacity: 0.6, strokeWeight: 4 });
+      });
+
+      naver.maps.Event.addListener(polygon, "mouseout", function () {
+        polygon.setOptions({ fillOpacity: 0.38, strokeWeight: 3 });
+      });
+
+      // 4. Center Marker with Badge
+      const markerContent = `
+        <div style="transform: translate(-50%, -100%); cursor: pointer; text-align: center;">
+          <div style="
+            background: #171918;
+            color: #ffffff;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 5px 9px;
+            border-radius: 8px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            white-space: nowrap;
+            border: 1px solid rgba(255,255,255,0.2);
+          ">
+            <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:${stageColor};"></span>
+            마포로1-24도시환경정비지구
+          </div>
+          <div style="
+            width: 0; 
+            height: 0; 
+            border-left: 6px solid transparent;
+            border-right: 6px solid transparent;
+            border-top: 6px solid #171918;
+            margin: 0 auto;
+          "></div>
+        </div>
+      `;
+
+      const marker = new naver.maps.Marker({
+        position: mapCenter,
+        map: map,
+        icon: {
+          content: markerContent,
+          anchor: new naver.maps.Point(0, 0),
+        },
+      });
+
+      // 5. InfoWindow
+      const infoContent = `
+        <div style="padding: 14px 16px; min-width: 220px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+          <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+            <span style="font-size: 11px; font-weight: 700; color: #ffffff; background: ${stageColor}; padding: 2px 6px; border-radius: 4px;">
+              사업시행인가
+            </span>
+            <span style="font-size: 11px; color: #666;">도시정비형 재개발</span>
+          </div>
+          <div style="font-size: 14px; font-weight: 700; color: #171918; margin-top: 4px;">
+            마포로1-24도시환경정비지구
+          </div>
+          <div style="font-size: 11px; color: #777; margin-top: 2px;">
+            서울특별시 마포구 도화동 16-1 일대
+          </div>
+          <div style="margin-top: 10px; padding-top: 8px; border-top: 1px solid #f0f0f0; display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 11px; color: #10b981; font-weight: 600;">✓ 구역 폴리곤 적용됨</span>
+            <a href="https://map.naver.com/p/search/%EB%A7%88%ED%8F%AC%EB%A1%9C1-24%EB%8F%84%EC%8B%9C%ED%99%98%EA%B2%BD%EC%A0%95%EB%B9%84%EC%A7%80%EA%B5%AC" target="_blank" style="font-size: 12px; font-weight: 700; color: #059669; text-decoration: none;">
+              네이버 지도 ↗
+            </a>
+          </div>
+        </div>
+      `;
+
+      const infoWindow = new naver.maps.InfoWindow({
+        content: infoContent,
+        backgroundColor: "#ffffff",
+        borderColor: "#e5e7eb",
+        borderWidth: 1,
+        disableAnchor: false,
+      });
+
+      naver.maps.Event.addListener(marker, "click", function () {
+        infoWindow.open(map, marker);
+      });
+      naver.maps.Event.addListener(polygon, "click", function () {
+        infoWindow.open(map, marker);
+      });
+
+      // 6. Cadastral (지적편집도) Toggle
+      let cadastralLayer = null;
+      let isCadastralOn = false;
+      const btnCadastral = document.getElementById("btn-cadastral");
+
+      btnCadastral.addEventListener("click", function () {
+        if (!cadastralLayer) {
+          cadastralLayer = new naver.maps.CadastralLayer();
+        }
+        if (isCadastralOn) {
+          cadastralLayer.setMap(null);
+          isCadastralOn = false;
+          btnCadastral.className = "px-3 py-1.5 rounded-xl border text-xs font-bold transition shadow-sm bg-white/95 border-black/10 text-[#171918] hover:bg-black/5";
+          btnCadastral.innerText = "지적편집도";
+        } else {
+          cadastralLayer.setMap(map);
+          isCadastralOn = true;
+          btnCadastral.className = "px-3 py-1.5 rounded-xl border text-xs font-bold transition shadow-sm bg-emerald-600 border-emerald-700 text-white";
+          btnCadastral.innerText = "✓ 지적편집도 ON";
+        }
+      });
+
+      // 7. Satellite Map Toggle
+      let isSatellite = false;
+      const btnMaptype = document.getElementById("btn-maptype");
+      btnMaptype.addEventListener("click", function () {
+        if (!isSatellite) {
+          map.setMapTypeId(naver.maps.MapTypeId.HYBRID);
+          isSatellite = true;
+          btnMaptype.className = "px-3 py-1.5 rounded-xl border text-xs font-bold transition shadow-sm bg-blue-600 border-blue-700 text-white";
+          btnMaptype.innerText = "일반지도 전환";
+        } else {
+          map.setMapTypeId(naver.maps.MapTypeId.NORMAL);
+          isSatellite = false;
+          btnMaptype.className = "px-3 py-1.5 rounded-xl border text-xs font-bold transition shadow-sm bg-white/95 border-black/10 text-[#171918] hover:bg-black/5";
+          btnMaptype.innerText = "위성지도";
+        }
+      });
+
+      // 8. Reset Center
+      document.getElementById("btn-reset-center").addEventListener("click", function () {
+        map.panTo(mapCenter);
+        map.setZoom(17);
+      });
+    });
+  </script>
+</body>
+</html>
